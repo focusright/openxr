@@ -1,5 +1,10 @@
+#pragma comment( lib, "OpenGL32.lib" )
+
 #include <iostream>
 #include <thread>
+#include <windows.h>
+#include <stdio.h>
+#include <gl/GL.h>
 
 int main(int argc, char* argv[]) {
     static bool quitKeyPressed = false;
