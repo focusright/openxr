@@ -7,8 +7,7 @@ int main(int argc, char* argv[]) {
         std::cout << "Press any key to shutdown...";
         (void)getchar();
         quitKeyPressed = true;
-    }};
-    exitPollingThread.detach();
+    }}; exitPollingThread.detach();
 
     do {
 
