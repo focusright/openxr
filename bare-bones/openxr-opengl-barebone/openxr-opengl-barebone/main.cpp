@@ -15,6 +15,11 @@
 
 using namespace std;
 
+struct Cube {
+    XrPosef Pose;
+    XrVector3f Scale;
+};
+
 struct swapchain_t {
 	XrSwapchain handle;
 	int32_t width;
@@ -55,6 +60,7 @@ XrDebugUtilsMessengerEXT xr_debug = {};
 
 vector<XrView>                  xr_views;
 vector<XrViewConfigurationView> xr_config_views;
+vector<swapchain_t>             xr_swapchains;
 
 int64_t gl_swapchain_fmt = GL_RGBA8;
 
@@ -136,11 +142,15 @@ bool openxr_init(const char *app_name, int64_t swapchain_format) {
 	XrGraphicsRequirementsOpenGLKHR requirement = { XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_KHR };
 	ext_xrGetOpenGLGraphicsRequirementsKHR(xr_instance, xr_system_id, &requirement);
 
-	//if (!d3d_init(requirement.adapterLuid))
+	//if (!d3d_init(requirement.adapterLuid)) // ksGpuWindow_Create() up to InitializeResources()
 	//	return false;
 
 	XrGraphicsBindingOpenGLWin32KHR binding = { XR_TYPE_GRAPHICS_BINDING_OPENGL_WIN32_KHR };
-	//binding.device = d3d_device;
+	//binding.device = d3d_device; // m_graphicsBinding.hDC = window.context.hDC;
+                                   // m_graphicsBinding.hGLRC = window.context.hGLRC;
+
+    //START program->InitializeSession();
+
 	XrSessionCreateInfo sessionInfo = { XR_TYPE_SESSION_CREATE_INFO };
 	sessionInfo.next     = &binding;
 	sessionInfo.systemId = xr_system_id;
@@ -149,6 +159,7 @@ bool openxr_init(const char *app_name, int64_t swapchain_format) {
 	if (xr_session == nullptr)
 		return false;
 
+    //CreateVisualizedSpaces()
 	XrReferenceSpaceCreateInfo ref_space = { XR_TYPE_REFERENCE_SPACE_CREATE_INFO };
 	ref_space.poseInReferenceSpace = xr_pose_identity;
 	ref_space.referenceSpaceType   = XR_REFERENCE_SPACE_TYPE_LOCAL;
@@ -159,10 +170,11 @@ bool openxr_init(const char *app_name, int64_t swapchain_format) {
 	xr_config_views.resize(view_count, { XR_TYPE_VIEW_CONFIGURATION_VIEW });
 	xr_views       .resize(view_count, { XR_TYPE_VIEW });
 	xrEnumerateViewConfigurationViews(xr_instance, xr_system_id, app_config_view, view_count, &view_count, xr_config_views.data());
+
 	for (uint32_t i = 0; i < view_count; i++) {
-		XrViewConfigurationView &view           = xr_config_views[i];
-		XrSwapchainCreateInfo    swapchain_info = { XR_TYPE_SWAPCHAIN_CREATE_INFO };
-		XrSwapchain              handle;
+		XrViewConfigurationView &view = xr_config_views[i];
+		XrSwapchainCreateInfo swapchain_info = { XR_TYPE_SWAPCHAIN_CREATE_INFO };
+		XrSwapchain handle;
 		swapchain_info.arraySize   = 1;
 		swapchain_info.mipCount    = 1;
 		swapchain_info.faceCount   = 1;
@@ -176,19 +188,13 @@ bool openxr_init(const char *app_name, int64_t swapchain_format) {
 		uint32_t surface_count = 0;
 		xrEnumerateSwapchainImages(handle, 0, &surface_count, nullptr);
 
-        /*
 		swapchain_t swapchain = {};
 		swapchain.width  = swapchain_info.width;
 		swapchain.height = swapchain_info.height;
 		swapchain.handle = handle;
-		swapchain.surface_images.resize(surface_count, { XR_TYPE_SWAPCHAIN_IMAGE_D3D11_KHR } );
-		swapchain.surface_data  .resize(surface_count);
+		swapchain.surface_images.resize(surface_count, { XR_TYPE_SWAPCHAIN_IMAGE_OPENGL_KHR } );
 		xrEnumerateSwapchainImages(swapchain.handle, surface_count, &surface_count, (XrSwapchainImageBaseHeader*)swapchain.surface_images.data());
-		for (uint32_t i = 0; i < surface_count; i++) {
-			swapchain.surface_data[i] = d3d_make_surface_data((XrBaseInStructure&)swapchain.surface_images[i]);
-		}
 		xr_swapchains.push_back(swapchain);
-        */
 	}
 
 	return true;
