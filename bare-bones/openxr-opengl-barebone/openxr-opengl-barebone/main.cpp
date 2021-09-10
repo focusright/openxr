@@ -36,6 +36,32 @@ struct InputState {
     std::array<XrBool32, Side::COUNT> handActive;
 };
 
+namespace Math {
+    namespace Pose {
+        XrPosef Identity() {
+            XrPosef t{};
+            t.orientation.w = 1;
+            return t;
+        }
+
+        XrPosef Translation(const XrVector3f& translation) {
+            XrPosef t = Identity();
+            t.position = translation;
+            return t;
+        }
+
+        XrPosef RotateCCWAboutYAxis(float radians, XrVector3f translation) {
+            XrPosef t = Identity();
+            t.orientation.x = 0.f;
+            t.orientation.y = std::sin(radians * 0.5f);
+            t.orientation.z = 0.f;
+            t.orientation.w = std::cos(radians * 0.5f);
+            t.position = translation;
+            return t;
+        }
+    }
+}
+
 XrInstance m_instance{XR_NULL_HANDLE};
 XrSession m_session{XR_NULL_HANDLE};
 XrSpace m_appSpace{XR_NULL_HANDLE};
