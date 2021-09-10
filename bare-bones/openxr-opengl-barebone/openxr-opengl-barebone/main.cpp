@@ -11,8 +11,16 @@
 #include <thread>
 #include <vector>
 #include <algorithm>
+#include <GL/gl.h>
 
 using namespace std;
+
+struct swapchain_t {
+	XrSwapchain handle;
+	int32_t width;
+	int32_t height;
+	vector<XrSwapchainImageOpenGLKHR> surface_images;
+};
 
 struct input_state_t {
 	XrActionSet actionSet;
@@ -48,7 +56,7 @@ XrDebugUtilsMessengerEXT xr_debug = {};
 vector<XrView>                  xr_views;
 vector<XrViewConfigurationView> xr_config_views;
 
-
+int64_t gl_swapchain_fmt = GL_RGBA8;
 
 
 bool openxr_init(const char *app_name, int64_t swapchain_format) {
@@ -91,8 +99,8 @@ bool openxr_init(const char *app_name, int64_t swapchain_format) {
 	if (xr_instance == nullptr)
 		return false;
 
-	xrGetInstanceProcAddr(xr_instance, "xrCreateDebugUtilsMessengerEXT",    (PFN_xrVoidFunction *)(&ext_xrCreateDebugUtilsMessengerEXT   ));
-	xrGetInstanceProcAddr(xr_instance, "xrDestroyDebugUtilsMessengerEXT",   (PFN_xrVoidFunction *)(&ext_xrDestroyDebugUtilsMessengerEXT  ));
+	xrGetInstanceProcAddr(xr_instance, "xrCreateDebugUtilsMessengerEXT",     (PFN_xrVoidFunction *)(&ext_xrCreateDebugUtilsMessengerEXT   ));
+	xrGetInstanceProcAddr(xr_instance, "xrDestroyDebugUtilsMessengerEXT",    (PFN_xrVoidFunction *)(&ext_xrDestroyDebugUtilsMessengerEXT  ));
 	xrGetInstanceProcAddr(xr_instance, "xrGetOpenGLGraphicsRequirementsKHR", (PFN_xrVoidFunction *)(&ext_xrGetOpenGLGraphicsRequirementsKHR));
 
 	XrDebugUtilsMessengerCreateInfoEXT debug_info = { XR_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT };
@@ -405,11 +413,12 @@ void openxr_shutdown() {
 
 
 int main(int argc, char* argv[]) {
-	//if (!openxr_init("Single file OpenXR", d3d_swapchain_fmt)) {
-	//	//d3d_shutdown();
-	//	MessageBox(nullptr, "OpenXR initialization failed\n", "Error", 1);
-	//	return 1;
-	//}
+	if (!openxr_init("Single file OpenXR", gl_swapchain_fmt)) {
+		//d3d_shutdown();
+		MessageBox(nullptr, "OpenXR initialization failed\n", "Error", 1);
+		return 1;
+	}
+
 	openxr_make_actions();
 	//app_init();
 
