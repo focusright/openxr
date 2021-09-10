@@ -9,19 +9,34 @@
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
 
-XrInstance xr_instance = {};
-XrSystemId xr_system_id = XR_NULL_SYSTEM_ID;
+bool m_sessionRunning{false};
 
-void openxr_init() {
-    XrSystemGetInfo systemInfo{XR_TYPE_SYSTEM_GET_INFO};
-    systemInfo.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
-    xrGetSystem(xr_instance, &systemInfo, &xr_system_id);
+void program_CreateInstance() {
 
+}
 
-    uint32_t ext_count = 0;
-    xrEnumerateInstanceExtensionProperties(nullptr, 0, &ext_count, nullptr);
-    std::vector<XrExtensionProperties> xr_exts(ext_count, { XR_TYPE_EXTENSION_PROPERTIES });
-    xrEnumerateInstanceExtensionProperties(nullptr, ext_count, &ext_count, xr_exts.data());
+void program_InitializeSystem() {
+
+}
+
+void program_InitializeSession() {
+
+}
+
+void program_CreateSwapchains() {
+
+}
+
+void program_PollEvents(bool* exitRenderLoop) {
+
+}
+
+void program_PollActions() {
+
+}
+
+void program_RenderFrame() {
+
 }
 
 int main(int argc, char* argv[]) {
@@ -32,10 +47,21 @@ int main(int argc, char* argv[]) {
         quitKeyPressed = true;
     }}; exitPollingThread.detach();
 
-    openxr_init();
+    program_CreateInstance();
+    program_InitializeSystem();
+    program_InitializeSession();
+    program_CreateSwapchains();
 
     do {
-
+        bool exitRenderLoop = false;
+        program_PollEvents(&exitRenderLoop);
+        if (exitRenderLoop) { break; }
+        if (m_sessionRunning) {
+            program_PollActions();
+            program_RenderFrame();
+        } else {
+            std::this_thread::sleep_for(std::chrono::milliseconds(250));
+        }
     } while (!quitKeyPressed);
     return 0;
 }
