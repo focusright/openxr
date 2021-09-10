@@ -240,24 +240,6 @@ void openxr_make_actions() {
 	xrAttachSessionActionSets(xr_session, &attach_info);
 }
 
-void openxr_shutdown() {
-	//for (int32_t i = 0; i < xr_swapchains.size(); i++) {
-	//	xrDestroySwapchain(xr_swapchains[i].handle);
-	//	d3d_swapchain_destroy(xr_swapchains[i]);
-	//}
-	//xr_swapchains.clear();
-
-	if (xr_input.actionSet != XR_NULL_HANDLE) {
-		if (xr_input.handSpace[0] != XR_NULL_HANDLE) xrDestroySpace(xr_input.handSpace[0]);
-		if (xr_input.handSpace[1] != XR_NULL_HANDLE) xrDestroySpace(xr_input.handSpace[1]);
-		xrDestroyActionSet(xr_input.actionSet);
-	}
-	if (xr_app_space != XR_NULL_HANDLE) xrDestroySpace   (xr_app_space);
-	if (xr_session   != XR_NULL_HANDLE) xrDestroySession (xr_session);
-	if (xr_debug     != XR_NULL_HANDLE) ext_xrDestroyDebugUtilsMessengerEXT(xr_debug);
-	if (xr_instance  != XR_NULL_HANDLE) xrDestroyInstance(xr_instance);
-}
-
 void openxr_poll_events(bool &exit) {
 	exit = false;
 
@@ -330,47 +312,6 @@ void openxr_poll_actions() {
 	}
 }
 
-void openxr_poll_predicted(XrTime predicted_time) {
-	if (xr_session_state != XR_SESSION_STATE_FOCUSED)
-		return;
-
-	for (size_t i = 0; i < 2; i++) {
-		if (!xr_input.renderHand[i])
-			continue;
-		XrSpaceLocation spaceRelation = { XR_TYPE_SPACE_LOCATION };
-		XrResult        res           = xrLocateSpace(xr_input.handSpace[i], xr_app_space, predicted_time, &spaceRelation);
-		if (XR_UNQUALIFIED_SUCCESS(res) &&
-			(spaceRelation.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT   ) != 0 &&
-			(spaceRelation.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) != 0) {
-			xr_input.handPose[i] = spaceRelation.pose;
-		}
-	}
-}
-
-void openxr_render_frame() {
-	XrFrameState frame_state = { XR_TYPE_FRAME_STATE };
-	xrWaitFrame (xr_session, nullptr, &frame_state);
-	xrBeginFrame(xr_session, nullptr);
-
-	openxr_poll_predicted(frame_state.predictedDisplayTime);
-
-	XrCompositionLayerBaseHeader            *layer      = nullptr;
-	XrCompositionLayerProjection             layer_proj = { XR_TYPE_COMPOSITION_LAYER_PROJECTION };
-	vector<XrCompositionLayerProjectionView> views;
-	bool session_active = xr_session_state == XR_SESSION_STATE_VISIBLE || xr_session_state == XR_SESSION_STATE_FOCUSED;
-
-	//if (session_active && openxr_render_layer(frame_state.predictedDisplayTime, views, layer_proj)) {
-	//	layer = (XrCompositionLayerBaseHeader*)&layer_proj;
-	//}
-
-	XrFrameEndInfo end_info{ XR_TYPE_FRAME_END_INFO };
-	end_info.displayTime          = frame_state.predictedDisplayTime;
-	end_info.environmentBlendMode = xr_blend;
-	end_info.layerCount           = layer == nullptr ? 0 : 1;
-	end_info.layers               = &layer;
-	xrEndFrame(xr_session, &end_info);
-}
-
 bool openxr_render_layer(XrTime predictedTime, vector<XrCompositionLayerProjectionView> &views, XrCompositionLayerProjection &layer) {
 	uint32_t         view_count  = 0;
 	XrViewState      view_state  = { XR_TYPE_VIEW_STATE };
@@ -409,7 +350,45 @@ bool openxr_render_layer(XrTime predictedTime, vector<XrCompositionLayerProjecti
 	return true;
 }
 
+void openxr_render_frame() {
+	XrFrameState frame_state = { XR_TYPE_FRAME_STATE };
+	xrWaitFrame (xr_session, nullptr, &frame_state);
+	xrBeginFrame(xr_session, nullptr);
 
+	XrCompositionLayerBaseHeader            *layer      = nullptr;
+	XrCompositionLayerProjection             layer_proj = { XR_TYPE_COMPOSITION_LAYER_PROJECTION };
+	vector<XrCompositionLayerProjectionView> views;
+	bool session_active = xr_session_state == XR_SESSION_STATE_VISIBLE || xr_session_state == XR_SESSION_STATE_FOCUSED;
+
+	if (session_active && openxr_render_layer(frame_state.predictedDisplayTime, views, layer_proj)) {
+		layer = (XrCompositionLayerBaseHeader*)&layer_proj;
+	}
+
+	XrFrameEndInfo end_info{ XR_TYPE_FRAME_END_INFO };
+	end_info.displayTime          = frame_state.predictedDisplayTime;
+	end_info.environmentBlendMode = xr_blend;
+	end_info.layerCount           = layer == nullptr ? 0 : 1;
+	end_info.layers               = &layer;
+	xrEndFrame(xr_session, &end_info);
+}
+
+void openxr_shutdown() {
+	//for (int32_t i = 0; i < xr_swapchains.size(); i++) {
+	//	xrDestroySwapchain(xr_swapchains[i].handle);
+	//	d3d_swapchain_destroy(xr_swapchains[i]);
+	//}
+	//xr_swapchains.clear();
+
+	if (xr_input.actionSet != XR_NULL_HANDLE) {
+		if (xr_input.handSpace[0] != XR_NULL_HANDLE) xrDestroySpace(xr_input.handSpace[0]);
+		if (xr_input.handSpace[1] != XR_NULL_HANDLE) xrDestroySpace(xr_input.handSpace[1]);
+		xrDestroyActionSet(xr_input.actionSet);
+	}
+	if (xr_app_space != XR_NULL_HANDLE) xrDestroySpace   (xr_app_space);
+	if (xr_session   != XR_NULL_HANDLE) xrDestroySession (xr_session);
+	if (xr_debug     != XR_NULL_HANDLE) ext_xrDestroyDebugUtilsMessengerEXT(xr_debug);
+	if (xr_instance  != XR_NULL_HANDLE) xrDestroyInstance(xr_instance);
+}
 
 
 
