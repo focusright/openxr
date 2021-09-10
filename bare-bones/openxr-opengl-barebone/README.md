@@ -25,6 +25,7 @@ xrEnumerateEnvironmentBlendModes
 
 xrGetInstanceProcAddr
 
+(Create window)
 (initialize OpenGL)
 
 xrCreateSession
