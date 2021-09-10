@@ -252,18 +252,18 @@ void openxr_poll_events(bool &exit) {
 			xr_session_state = changed->state;
 
 			switch (xr_session_state) {
-			case XR_SESSION_STATE_READY: {
-				XrSessionBeginInfo begin_info = { XR_TYPE_SESSION_BEGIN_INFO };
-				begin_info.primaryViewConfigurationType = app_config_view;
-				xrBeginSession(xr_session, &begin_info);
-				xr_running = true;
-			} break;
-			case XR_SESSION_STATE_STOPPING: {
-				xr_running = false;
-				xrEndSession(xr_session); 
-			} break;
-			case XR_SESSION_STATE_EXITING:      exit = true;              break;
-			case XR_SESSION_STATE_LOSS_PENDING: exit = true;              break;
+			    case XR_SESSION_STATE_READY: {
+				    XrSessionBeginInfo begin_info = { XR_TYPE_SESSION_BEGIN_INFO };
+				    begin_info.primaryViewConfigurationType = app_config_view;
+				    xrBeginSession(xr_session, &begin_info);
+				    xr_running = true;
+			    } break;
+			    case XR_SESSION_STATE_STOPPING: {
+				    xr_running = false;
+				    xrEndSession(xr_session); 
+			    } break;
+			    case XR_SESSION_STATE_EXITING:      exit = true;              break;
+			    case XR_SESSION_STATE_LOSS_PENDING: exit = true;              break;
 			}
 		} break;
 		case XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING: exit = true; return;
@@ -404,7 +404,7 @@ void openxr_shutdown() {
 
 
 
-int __stdcall wWinMain(HINSTANCE, HINSTANCE, LPWSTR, int) {
+int main(int argc, char* argv[]) {
 	//if (!openxr_init("Single file OpenXR", d3d_swapchain_fmt)) {
 	//	//d3d_shutdown();
 	//	MessageBox(nullptr, "OpenXR initialization failed\n", "Error", 1);
