@@ -1044,6 +1044,7 @@ vector<XrViewConfigurationView> xr_config_views;
 vector<swapchain_t>             xr_swapchains;
 
 int64_t gl_swapchain_fmt = GL_RGBA8;
+XrGraphicsBindingOpenGLWin32KHR m_graphicsBinding{XR_TYPE_GRAPHICS_BINDING_OPENGL_WIN32_KHR};
 
 
 bool openxr_init(const char *app_name, int64_t swapchain_format) {
@@ -1126,14 +1127,13 @@ bool openxr_init(const char *app_name, int64_t swapchain_format) {
 	//if (!d3d_init(requirement.adapterLuid)) // ksGpuWindow_Create() up to InitializeResources()
 	//	return false;
 
-	XrGraphicsBindingOpenGLWin32KHR binding = { XR_TYPE_GRAPHICS_BINDING_OPENGL_WIN32_KHR };
-	//binding.device = d3d_device; // m_graphicsBinding.hDC = window.context.hDC;
-                                   // m_graphicsBinding.hGLRC = window.context.hGLRC;
+	//m_graphicsBinding.hDC = window.context.hDC;
+    //m_graphicsBinding.hGLRC = window.context.hGLRC;
 
     //START program->InitializeSession();
 
 	XrSessionCreateInfo sessionInfo = { XR_TYPE_SESSION_CREATE_INFO };
-	sessionInfo.next     = &binding;
+	sessionInfo.next     = &m_graphicsBinding;
 	sessionInfo.systemId = xr_system_id;
 	xrCreateSession(xr_instance, &sessionInfo, &xr_session);
 
@@ -1398,6 +1398,59 @@ void openxr_shutdown() {
 
 
 
+ksGpuWindow window{};
+
+void device_init() {
+        PFN_xrGetOpenGLGraphicsRequirementsKHR pfnGetOpenGLGraphicsRequirementsKHR = nullptr;
+        xrGetInstanceProcAddr(xr_instance, "xrGetOpenGLGraphicsRequirementsKHR", reinterpret_cast<PFN_xrVoidFunction*>(&pfnGetOpenGLGraphicsRequirementsKHR));
+
+        XrGraphicsRequirementsOpenGLKHR graphicsRequirements{XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_KHR};
+        pfnGetOpenGLGraphicsRequirementsKHR(xr_instance, xr_system_id, &graphicsRequirements);
+
+        ksDriverInstance driverInstance{};
+        ksGpuQueueInfo queueInfo{};
+        ksGpuSurfaceColorFormat colorFormat{KS_GPU_SURFACE_COLOR_FORMAT_B8G8R8A8};
+        ksGpuSurfaceDepthFormat depthFormat{KS_GPU_SURFACE_DEPTH_FORMAT_D24};
+        ksGpuSampleCount sampleCount{KS_GPU_SAMPLE_COUNT_1};
+        if (!ksGpuWindow_Create(&window, &driverInstance, &queueInfo, 0, colorFormat, depthFormat, sampleCount, 640, 480, false)) {
+            throw std::logic_error("Unable to create GL context");
+        }
+
+        GLint major = 0;
+        GLint minor = 0;
+        glGetIntegerv(GL_MAJOR_VERSION, &major);
+        glGetIntegerv(GL_MINOR_VERSION, &minor);
+
+        const XrVersion desiredApiVersion = XR_MAKE_VERSION(major, minor, 0);
+        if (graphicsRequirements.minApiVersionSupported > desiredApiVersion) {
+            throw std::logic_error("Runtime does not support desired Graphics API and/or version");
+        }
+
+        m_graphicsBinding.hDC = window.context.hDC;
+        m_graphicsBinding.hGLRC = window.context.hGLRC;
+        glEnable(GL_DEBUG_OUTPUT); //may need to import code for gl debugging
+}
+
+void opengl_init() {
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 int main(int argc, char* argv[]) {
 	if (!openxr_init("Single file OpenXR", gl_swapchain_fmt)) {
@@ -1407,7 +1460,8 @@ int main(int argc, char* argv[]) {
 	}
 
 	openxr_make_actions();
-	//app_init();
+    device_init();
+	opengl_init();
 
 	bool quit = false;
 	while (!quit) {
