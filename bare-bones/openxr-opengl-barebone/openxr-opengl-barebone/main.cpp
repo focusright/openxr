@@ -716,7 +716,6 @@ static bool ksGpuContext_CreateForSurface(ksGpuContext *context, const ksGpuDevi
         return false;
     }
 
-    // Now that the pixel format is set, create a temporary context to get the extensions.
     {
         HGLRC hGLRC = wglCreateContext(localDC);
         wglMakeCurrent(localDC, hGLRC);
@@ -866,7 +865,6 @@ bool ksGpuWindow_Create(ksGpuWindow *window, ksDriverInstance *instance, const k
         dwStyle = WS_POPUP;
         ShowCursor(FALSE);
     } else {
-        // Fixed size window.
         dwExStyle = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE;
         dwStyle = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
     }
@@ -1011,8 +1009,7 @@ struct Cube {
     XrVector3f Scale;
 };
 
-//function protocols for openxr_init() to see
-void device_init(); 
+void device_init(); //function protocols for openxr_init() to see
 void opengl_render_layer(const XrCompositionLayerProjectionView& layerView, const XrSwapchainImageOpenGLKHR* swapchainImage, const std::vector<Cube>& cubes, int index);
 
 struct swapchain_t {
@@ -1105,8 +1102,7 @@ XrReferenceSpaceCreateInfo GetXrReferenceSpaceCreateInfo(const std::string& refe
     referenceSpaceCreateInfo.poseInReferenceSpace = Math::Pose::Identity();
     if (EqualsIgnoreCase(referenceSpaceTypeStr, "View")) {
         referenceSpaceCreateInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_VIEW;
-    } else if (EqualsIgnoreCase(referenceSpaceTypeStr, "ViewFront")) {
-        // Render head-locked 2m in front of device.
+    } else if (EqualsIgnoreCase(referenceSpaceTypeStr, "ViewFront")) { // Render head-locked 2m in front of device.
         referenceSpaceCreateInfo.poseInReferenceSpace = Math::Pose::Translation({0.f, 0.f, -2.f}),
         referenceSpaceCreateInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_VIEW;
     } else if (EqualsIgnoreCase(referenceSpaceTypeStr, "Local")) {
@@ -1607,8 +1603,7 @@ namespace Geometry {
     constexpr XrVector3f Blue{0, 0, 1};
     constexpr XrVector3f DarkBlue{0, 0, 0.25f};
 
-    // Vertices for a 1x1x1 meter cube. (Left/Right, Top/Bottom, Front/Back)
-    constexpr XrVector3f LBB{-0.5f, -0.5f, -0.5f};
+    constexpr XrVector3f LBB{-0.5f, -0.5f, -0.5f}; // Vertices for a 1x1x1 meter cube. (Left/Right, Top/Bottom, Front/Back)
     constexpr XrVector3f LBF{-0.5f, -0.5f, 0.5f};
     constexpr XrVector3f LTB{-0.5f, 0.5f, -0.5f};
     constexpr XrVector3f LTF{-0.5f, 0.5f, 0.5f};
@@ -1706,13 +1701,10 @@ void opengl_init() {
 }
 
 uint32_t GetDepthTexture(uint32_t colorTexture) {
-    // If a depth-stencil view has already been created for this back-buffer, use it.
     auto depthBufferIt = m_colorToDepthMap.find(colorTexture);
     if (depthBufferIt != m_colorToDepthMap.end()) {
         return depthBufferIt->second;
     }
-
-    // This back-buffer has no corresponding depth-stencil texture, so create one with matching dimensions.
 
     GLint width;
     GLint height;
@@ -1757,12 +1749,10 @@ void opengl_render_layer(const XrCompositionLayerProjectionView& layerView, cons
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorTexture, 0);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTexture, 0);
 
-        // Clear swapchain and depth buffer.
         glClearColor(DarkSlateGray[0], DarkSlateGray[1], DarkSlateGray[2], DarkSlateGray[3]);
         glClearDepth(1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
-        // Set shaders and uniform variables.
         glUseProgram(m_program);
 
         const auto& pose = layerView.pose;
@@ -1776,19 +1766,15 @@ void opengl_render_layer(const XrCompositionLayerProjectionView& layerView, cons
         XrMatrix4x4f vp;
         XrMatrix4x4f_Multiply(&vp, &proj, &view);
 
-        // Set cube primitive data.
         glBindVertexArray(m_vao);
 
-        // Render each cube
         for (const Cube& cube : cubes) {
-            // Compute the model-view-projection transform and set it..
             XrMatrix4x4f model;
             XrMatrix4x4f_CreateTranslationRotationScale(&model, &cube.Pose.position, &cube.Pose.orientation, &cube.Scale);
             XrMatrix4x4f mvp;
             XrMatrix4x4f_Multiply(&mvp, &vp, &model);
             glUniformMatrix4fv(m_modelViewProjectionUniformLocation, 1, GL_FALSE, reinterpret_cast<const GLfloat*>(&mvp));
 
-            // Draw the cube.
             glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(ArraySize(Geometry::c_cubeIndices)), GL_UNSIGNED_SHORT, nullptr);
         }
 
