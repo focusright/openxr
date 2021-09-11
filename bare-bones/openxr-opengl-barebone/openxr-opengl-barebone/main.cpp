@@ -989,7 +989,7 @@ bool ksGpuWindow_Create(ksGpuWindow *window, ksDriverInstance *instance, const k
 
 
 
-
+void device_init(); //function protocol for openxr_init() to see
 
 
 
@@ -1124,13 +1124,7 @@ bool openxr_init(const char *app_name, int64_t swapchain_format) {
 	XrGraphicsRequirementsOpenGLKHR requirement = { XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_KHR };
 	ext_xrGetOpenGLGraphicsRequirementsKHR(xr_instance, xr_system_id, &requirement);
 
-	//if (!d3d_init(requirement.adapterLuid)) // ksGpuWindow_Create() up to InitializeResources()
-	//	return false;
-
-	//m_graphicsBinding.hDC = window.context.hDC;
-    //m_graphicsBinding.hGLRC = window.context.hGLRC;
-
-    //START program->InitializeSession();
+    device_init();
 
 	XrSessionCreateInfo sessionInfo = { XR_TYPE_SESSION_CREATE_INFO };
 	sessionInfo.next     = &m_graphicsBinding;
@@ -1460,7 +1454,6 @@ int main(int argc, char* argv[]) {
 	}
 
 	openxr_make_actions();
-    device_init();
 	opengl_init();
 
 	bool quit = false;
