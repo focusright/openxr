@@ -24,6 +24,7 @@
 #include <string>
 #include <algorithm>
 #include <map>
+#include <array>
 
 
 using namespace std;
@@ -1030,6 +1031,7 @@ struct input_state_t {
 	XrPosef  handPose[2];
 	XrBool32 renderHand[2];
 	XrBool32 handSelect[2];
+    std::array<XrBool32, 2> handActive;
 };
 
 PFN_xrGetOpenGLGraphicsRequirementsKHR ext_xrGetOpenGLGraphicsRequirementsKHR = nullptr;
@@ -1122,6 +1124,9 @@ XrReferenceSpaceCreateInfo GetXrReferenceSpaceCreateInfo(const std::string& refe
         referenceSpaceCreateInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
     } else if (EqualsIgnoreCase(referenceSpaceTypeStr, "StageRightRotated")) {
         referenceSpaceCreateInfo.poseInReferenceSpace = Math::Pose::RotateCCWAboutYAxis(-3.14f / 3.f, {2.f, 0.5f, -2.f});
+        referenceSpaceCreateInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
+    } else if (EqualsIgnoreCase(referenceSpaceTypeStr, "Custom")) {
+        referenceSpaceCreateInfo.poseInReferenceSpace = Math::Pose::RotateCCWAboutYAxis(0.f, {-.3f, 1.5f, -1.f});
         referenceSpaceCreateInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
     } else {
         throw std::logic_error("Unknown reference space type " + referenceSpaceTypeStr);
@@ -1216,8 +1221,8 @@ bool openxr_init(const char *app_name, int64_t swapchain_format) {
 	if (xr_session == nullptr)
 		return false;
 
-    //CreateVisualizedSpaces()
-    std::string visualizedSpaces[] = {"ViewFront", "Local", "Stage", "StageLeft", "StageRight", "StageLeftRotated", "StageRightRotated"};
+    //std::string visualizedSpaces[] = {"ViewFront", "Local", "Stage", "StageLeft", "StageRight", "StageLeftRotated", "StageRightRotated"};
+    std::string visualizedSpaces[] = {"Custom"};
     for (const auto& visualizedSpace : visualizedSpaces) {
         XrReferenceSpaceCreateInfo referenceSpaceCreateInfo = GetXrReferenceSpaceCreateInfo(visualizedSpace);
         XrSpace space;
@@ -1358,6 +1363,8 @@ void openxr_poll_actions() {
 	if (xr_session_state != XR_SESSION_STATE_FOCUSED)
 		return;
 
+    xr_input.handActive = {XR_FALSE, XR_FALSE};
+
 	XrActiveActionSet action_set = { };
 	action_set.actionSet     = xr_input.actionSet;
 	action_set.subactionPath = XR_NULL_PATH;
@@ -1376,6 +1383,7 @@ void openxr_poll_actions() {
 		get_info.action = xr_input.poseAction;
 		xrGetActionStatePose(xr_session, &get_info, &pose_state);
 		xr_input.renderHand[hand] = pose_state.isActive;
+        xr_input.handActive[hand] = pose_state.isActive;
 
 		XrActionStateBoolean select_state = { XR_TYPE_ACTION_STATE_BOOLEAN };
 		get_info.action = xr_input.selectAction;
@@ -1424,7 +1432,12 @@ bool openxr_render_layer(XrTime predictedDisplayTime, vector<XrCompositionLayerP
         if (XR_UNQUALIFIED_SUCCESS(res)) {
             if ((spaceLocation.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0 &&
                 (spaceLocation.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) != 0) {
-                cubes.push_back(Cube{spaceLocation.pose, {1, 1, 1}});
+                cubes.push_back(Cube{spaceLocation.pose, {0.1f, 0.1f, 0.1f}});
+            }
+        } else {
+            if (xr_input.handActive[hand] == XR_TRUE) {
+                const char* handName[] = {"left", "right"};
+                printf("Unable to locate %s hand action space in app space: %d", handName[hand], res);
             }
         }
     }
@@ -1819,7 +1832,7 @@ int main(int argc, char* argv[]) {
 	}
     static bool quit = false;
     auto exitPollingThread = std::thread{[] {
-        printf("Press any key to shutdown...");
+        printf("Press Enter key to shutdown...");
         (void)getchar();
         quit = true;
     }}; exitPollingThread.detach();
