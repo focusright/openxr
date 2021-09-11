@@ -1494,17 +1494,21 @@ void openxr_render_frame() {
 }
 
 void openxr_shutdown() {
-	//for (int32_t i = 0; i < xr_swapchains.size(); i++) {
-	//	xrDestroySwapchain(xr_swapchains[i].handle);
-	//	d3d_swapchain_destroy(xr_swapchains[i]);
-	//}
-	//xr_swapchains.clear();
+	for (int32_t i = 0; i < xr_swapchains.size(); i++) {
+		xrDestroySwapchain(xr_swapchains[i].handle);
+	}
+	xr_swapchains.clear();
+    
+    for (XrSpace visualizedSpace : m_visualizedSpaces) {
+        xrDestroySpace(visualizedSpace);
+    }
 
 	if (xr_input.actionSet != XR_NULL_HANDLE) {
 		if (xr_input.handSpace[0] != XR_NULL_HANDLE) xrDestroySpace(xr_input.handSpace[0]);
 		if (xr_input.handSpace[1] != XR_NULL_HANDLE) xrDestroySpace(xr_input.handSpace[1]);
 		xrDestroyActionSet(xr_input.actionSet);
 	}
+    
 	if (xr_app_space != XR_NULL_HANDLE) xrDestroySpace   (xr_app_space);
 	if (xr_session   != XR_NULL_HANDLE) xrDestroySession (xr_session);
 	if (xr_debug     != XR_NULL_HANDLE) ext_xrDestroyDebugUtilsMessengerEXT(xr_debug);
@@ -1809,7 +1813,19 @@ void opengl_render_layer(const XrCompositionLayerProjectionView& layerView, cons
         }
 }
 
+void opengl_shutdown() {
+    glDeleteFramebuffers(1, &m_swapchainFramebuffer);
+    glDeleteProgram(m_program);
+    glDeleteVertexArrays(1, &m_vao);
+    glDeleteBuffers(1, &m_cubeVertexBuffer);
+    glDeleteBuffers(1, &m_cubeIndexBuffer);
 
+    for (auto& colorToDepth : m_colorToDepthMap) {
+        if (colorToDepth.second != 0) {
+            glDeleteTextures(1, &colorToDepth.second);
+        }
+    }
+}
 
 
 
@@ -1826,10 +1842,11 @@ void opengl_render_layer(const XrCompositionLayerProjectionView& layerView, cons
 
 int main(int argc, char* argv[]) {
 	if (!openxr_init("Single file OpenXR", gl_swapchain_fmt)) {
-		//d3d_shutdown();
+		opengl_shutdown();
 		MessageBox(nullptr, "OpenXR initialization failed\n", "Error", 1);
 		return 1;
 	}
+
     static bool quit = false;
     auto exitPollingThread = std::thread{[] {
         printf("Press Enter key to shutdown...");
@@ -1845,7 +1862,6 @@ int main(int argc, char* argv[]) {
 
 		if (xr_running) {
 			openxr_poll_actions();
-			//app_update();
 			openxr_render_frame();
 
 			if (xr_session_state != XR_SESSION_STATE_VISIBLE && 
@@ -1856,6 +1872,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	openxr_shutdown();
-    //d3d_shutdown();
+    opengl_shutdown();
+
 	return 0;
 }
