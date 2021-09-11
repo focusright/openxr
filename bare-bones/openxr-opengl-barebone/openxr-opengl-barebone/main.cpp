@@ -1817,11 +1817,16 @@ int main(int argc, char* argv[]) {
 		MessageBox(nullptr, "OpenXR initialization failed\n", "Error", 1);
 		return 1;
 	}
+    static bool quit = false;
+    auto exitPollingThread = std::thread{[] {
+        printf("Press any key to shutdown...");
+        (void)getchar();
+        quit = true;
+    }}; exitPollingThread.detach();
 
 	openxr_make_actions();
 	opengl_init();
 
-	bool quit = false;
 	while (!quit) {
 		openxr_poll_events(quit);
 
