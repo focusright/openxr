@@ -18,11 +18,12 @@
 #include <GL/gl_format.h>
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
+#include <common/xr_linear.h>
 #include <thread>
 #include <vector>
 #include <string>
 #include <algorithm>
-
+#include <map>
 
 
 using namespace std;
@@ -931,6 +932,16 @@ bool ksGpuWindow_Create(ksGpuWindow *window, ksDriverInstance *instance, const k
     return true;
 }
 
+void ksGpuWindow_SwapBuffers(ksGpuWindow *window) {
+    SwapBuffers(window->context.hDC);
+    ksNanoseconds newTimeNanoseconds = GetTimeNanoseconds();
+    const float frameTimeNanoseconds = 1000.0f * 1000.0f * 1000.0f / window->windowRefreshRate;
+    const float deltaTimeNanoseconds = (float)newTimeNanoseconds - window->lastSwapTime - frameTimeNanoseconds;
+    if (fabsf(deltaTimeNanoseconds) < frameTimeNanoseconds * 0.75f) {
+        newTimeNanoseconds = (ksNanoseconds)(window->lastSwapTime + frameTimeNanoseconds + 0.025f * deltaTimeNanoseconds);
+    }
+    window->lastSwapTime = newTimeNanoseconds;
+}
 
 
 
@@ -988,9 +999,6 @@ bool ksGpuWindow_Create(ksGpuWindow *window, ksDriverInstance *instance, const k
 
 
 
-
-
-void device_init(); //function protocol for openxr_init() to see
 
 
 
@@ -1001,6 +1009,10 @@ struct Cube {
     XrPosef Pose;
     XrVector3f Scale;
 };
+
+//function protocols for openxr_init() to see
+void device_init(); 
+void opengl_render_layer(const XrCompositionLayerProjectionView& layerView, const XrSwapchainImageOpenGLKHR* swapchainImage, const std::vector<Cube>& cubes, int index);
 
 struct swapchain_t {
 	XrSwapchain handle;
@@ -1046,7 +1058,76 @@ vector<swapchain_t>             xr_swapchains;
 
 int64_t gl_swapchain_fmt = GL_RGBA8;
 XrGraphicsBindingOpenGLWin32KHR m_graphicsBinding{XR_TYPE_GRAPHICS_BINDING_OPENGL_WIN32_KHR};
+std::vector<XrSpace> m_visualizedSpaces;
 
+namespace Side {
+    const int LEFT = 0;
+    const int RIGHT = 1;
+    const int COUNT = 2;
+}
+
+namespace Math {
+    namespace Pose {
+        XrPosef Identity() {
+            XrPosef t{};
+            t.orientation.w = 1;
+            return t;
+        }
+
+        XrPosef Translation(const XrVector3f& translation) {
+            XrPosef t = Identity();
+            t.position = translation;
+            return t;
+        }
+
+        XrPosef RotateCCWAboutYAxis(float radians, XrVector3f translation) {
+            XrPosef t = Identity();
+            t.orientation.x = 0.f;
+            t.orientation.y = std::sin(radians * 0.5f);
+            t.orientation.z = 0.f;
+            t.orientation.w = std::cos(radians * 0.5f);
+            t.position = translation;
+            return t;
+        }
+    }
+}
+
+inline bool EqualsIgnoreCase(const std::string& s1, const std::string& s2, const std::locale& loc = std::locale()) {
+    const std::ctype<char>& ctype = std::use_facet<std::ctype<char>>(loc);
+    const auto compareCharLower = [&](char c1, char c2) { return ctype.tolower(c1) == ctype.tolower(c2); };
+    return s1.size() == s2.size() && std::equal(s1.begin(), s1.end(), s2.begin(), compareCharLower);
+}
+
+XrReferenceSpaceCreateInfo GetXrReferenceSpaceCreateInfo(const std::string& referenceSpaceTypeStr) {
+    XrReferenceSpaceCreateInfo referenceSpaceCreateInfo{XR_TYPE_REFERENCE_SPACE_CREATE_INFO};
+    referenceSpaceCreateInfo.poseInReferenceSpace = Math::Pose::Identity();
+    if (EqualsIgnoreCase(referenceSpaceTypeStr, "View")) {
+        referenceSpaceCreateInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_VIEW;
+    } else if (EqualsIgnoreCase(referenceSpaceTypeStr, "ViewFront")) {
+        // Render head-locked 2m in front of device.
+        referenceSpaceCreateInfo.poseInReferenceSpace = Math::Pose::Translation({0.f, 0.f, -2.f}),
+        referenceSpaceCreateInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_VIEW;
+    } else if (EqualsIgnoreCase(referenceSpaceTypeStr, "Local")) {
+        referenceSpaceCreateInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_LOCAL;
+    } else if (EqualsIgnoreCase(referenceSpaceTypeStr, "Stage")) {
+        referenceSpaceCreateInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
+    } else if (EqualsIgnoreCase(referenceSpaceTypeStr, "StageLeft")) {
+        referenceSpaceCreateInfo.poseInReferenceSpace = Math::Pose::RotateCCWAboutYAxis(0.f, {-2.f, 0.f, -2.f});
+        referenceSpaceCreateInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
+    } else if (EqualsIgnoreCase(referenceSpaceTypeStr, "StageRight")) {
+        referenceSpaceCreateInfo.poseInReferenceSpace = Math::Pose::RotateCCWAboutYAxis(0.f, {2.f, 0.f, -2.f});
+        referenceSpaceCreateInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
+    } else if (EqualsIgnoreCase(referenceSpaceTypeStr, "StageLeftRotated")) {
+        referenceSpaceCreateInfo.poseInReferenceSpace = Math::Pose::RotateCCWAboutYAxis(3.14f / 3.f, {-2.f, 0.5f, -2.f});
+        referenceSpaceCreateInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
+    } else if (EqualsIgnoreCase(referenceSpaceTypeStr, "StageRightRotated")) {
+        referenceSpaceCreateInfo.poseInReferenceSpace = Math::Pose::RotateCCWAboutYAxis(-3.14f / 3.f, {2.f, 0.5f, -2.f});
+        referenceSpaceCreateInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
+    } else {
+        throw std::logic_error("Unknown reference space type " + referenceSpaceTypeStr);
+    }
+    return referenceSpaceCreateInfo;
+}
 
 bool openxr_init(const char *app_name, int64_t swapchain_format) {
 	vector<const char*> use_extensions;
@@ -1136,6 +1217,17 @@ bool openxr_init(const char *app_name, int64_t swapchain_format) {
 		return false;
 
     //CreateVisualizedSpaces()
+    std::string visualizedSpaces[] = {"ViewFront", "Local", "Stage", "StageLeft", "StageRight", "StageLeftRotated", "StageRightRotated"};
+    for (const auto& visualizedSpace : visualizedSpaces) {
+        XrReferenceSpaceCreateInfo referenceSpaceCreateInfo = GetXrReferenceSpaceCreateInfo(visualizedSpace);
+        XrSpace space;
+        XrResult res = xrCreateReferenceSpace(xr_session, &referenceSpaceCreateInfo, &space);
+        if (XR_SUCCEEDED(res)) {
+            m_visualizedSpaces.push_back(space);
+        } else {
+            printf("Failed to create reference space %s with error %d", visualizedSpace.c_str(), res);
+        }
+    }
 	XrReferenceSpaceCreateInfo ref_space = { XR_TYPE_REFERENCE_SPACE_CREATE_INFO };
 	ref_space.poseInReferenceSpace = xr_pose_identity;
 	ref_space.referenceSpaceType   = XR_REFERENCE_SPACE_TYPE_LOCAL;
@@ -1292,7 +1384,7 @@ void openxr_poll_actions() {
 
 		if (xr_input.handSelect[hand]) {
 			XrSpaceLocation space_location = { XR_TYPE_SPACE_LOCATION };
-			XrResult        res            = xrLocateSpace(xr_input.handSpace[hand], xr_app_space, select_state.lastChangeTime, &space_location);
+			XrResult res = xrLocateSpace(xr_input.handSpace[hand], xr_app_space, select_state.lastChangeTime, &space_location);
 			if (XR_UNQUALIFIED_SUCCESS(res) &&
 				(space_location.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT   ) != 0 &&
 				(space_location.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) != 0) {
@@ -1302,36 +1394,62 @@ void openxr_poll_actions() {
 	}
 }
 
-bool openxr_render_layer(XrTime predictedTime, vector<XrCompositionLayerProjectionView> &views, XrCompositionLayerProjection &layer) {
-	uint32_t         view_count  = 0;
-	XrViewState      view_state  = { XR_TYPE_VIEW_STATE };
+bool openxr_render_layer(XrTime predictedDisplayTime, vector<XrCompositionLayerProjectionView> &views, XrCompositionLayerProjection &layer) {
+	uint32_t view_count  = 0;
+	XrViewState view_state  = { XR_TYPE_VIEW_STATE };
 	XrViewLocateInfo locate_info = { XR_TYPE_VIEW_LOCATE_INFO };
 	locate_info.viewConfigurationType = app_config_view;
-	locate_info.displayTime           = predictedTime;
-	locate_info.space                 = xr_app_space;
+	locate_info.space = xr_app_space;
 	xrLocateViews(xr_session, &locate_info, &view_state, (uint32_t)xr_views.size(), &view_count, xr_views.data());
 	views.resize(view_count);
 
+    std::vector<Cube> cubes;
+    XrResult res;
+    for (XrSpace visualizedSpace : m_visualizedSpaces) {
+        XrSpaceLocation spaceLocation{XR_TYPE_SPACE_LOCATION};
+        res = xrLocateSpace(visualizedSpace, xr_app_space, predictedDisplayTime, &spaceLocation);
+        if (XR_UNQUALIFIED_SUCCESS(res)) {
+            if ((spaceLocation.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0 &&
+                (spaceLocation.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) != 0) {
+                cubes.push_back(Cube{spaceLocation.pose, {0.25f, 0.25f, 0.25f}});
+            }
+        } else {
+            printf("Unable to locate a visualized reference space in app space: %d", res);
+        }
+    }
+
+    for (auto hand : {Side::LEFT, Side::RIGHT}) {
+        XrSpaceLocation spaceLocation{XR_TYPE_SPACE_LOCATION};
+        res = xrLocateSpace(xr_input.handSpace[hand], xr_app_space, predictedDisplayTime, &spaceLocation);
+        if (XR_UNQUALIFIED_SUCCESS(res)) {
+            if ((spaceLocation.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0 &&
+                (spaceLocation.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) != 0) {
+                cubes.push_back(Cube{spaceLocation.pose, {1, 1, 1}});
+            }
+        }
+    }
+
 	for (uint32_t i = 0; i < view_count; i++) {
-		uint32_t                    img_id;
+		uint32_t img_id;
 		XrSwapchainImageAcquireInfo acquire_info = { XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO };
-		//xrAcquireSwapchainImage(xr_swapchains[i].handle, &acquire_info, &img_id);
+		xrAcquireSwapchainImage(xr_swapchains[i].handle, &acquire_info, &img_id);
 
 		XrSwapchainImageWaitInfo wait_info = { XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO };
 		wait_info.timeout = XR_INFINITE_DURATION;
-		//xrWaitSwapchainImage(xr_swapchains[i].handle, &wait_info);
+		xrWaitSwapchainImage(xr_swapchains[i].handle, &wait_info);
 
 		views[i] = { XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW };
 		views[i].pose = xr_views[i].pose;
 		views[i].fov  = xr_views[i].fov;
-		//views[i].subImage.swapchain        = xr_swapchains[i].handle;
+		views[i].subImage.swapchain = xr_swapchains[i].handle;
 		views[i].subImage.imageRect.offset = { 0, 0 };
-		//views[i].subImage.imageRect.extent = { xr_swapchains[i].width, xr_swapchains[i].height };
+		views[i].subImage.imageRect.extent = { xr_swapchains[i].width, xr_swapchains[i].height };
 
-		//d3d_render_layer(views[i], xr_swapchains[i].surface_data[img_id]);
+        const XrSwapchainImageOpenGLKHR* const swapchainImage = &xr_swapchains[i].surface_images[img_id];
+        opengl_render_layer(views[i], swapchainImage, cubes, i);
 
 		XrSwapchainImageReleaseInfo release_info = { XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO };
-		//xrReleaseSwapchainImage(xr_swapchains[i].handle, &release_info);
+		xrReleaseSwapchainImage(xr_swapchains[i].handle, &release_info);
 	}
 
 	layer.space     = xr_app_space;
@@ -1436,6 +1554,7 @@ GLint m_vertexAttribColor{0};
 GLuint m_vao{0};
 GLuint m_cubeVertexBuffer{0};
 GLuint m_cubeIndexBuffer{0};
+std::map<uint32_t, uint32_t> m_colorToDepthMap;
 
 constexpr float DarkSlateGray[] = {0.184313729f, 0.309803933f, 0.309803933f, 1.0f};
 static const char* VertexShaderGlsl = R"_(
@@ -1569,7 +1688,113 @@ void opengl_init() {
         glVertexAttribPointer(m_vertexAttribColor, 3, GL_FLOAT, GL_FALSE, sizeof(Geometry::Vertex), reinterpret_cast<const void*>(sizeof(XrVector3f)));
 }
 
+uint32_t GetDepthTexture(uint32_t colorTexture) {
+    // If a depth-stencil view has already been created for this back-buffer, use it.
+    auto depthBufferIt = m_colorToDepthMap.find(colorTexture);
+    if (depthBufferIt != m_colorToDepthMap.end()) {
+        return depthBufferIt->second;
+    }
 
+    // This back-buffer has no corresponding depth-stencil texture, so create one with matching dimensions.
+
+    GLint width;
+    GLint height;
+    glBindTexture(GL_TEXTURE_2D, colorTexture);
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &width);
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &height);
+
+    uint32_t depthTexture;
+    glGenTextures(1, &depthTexture);
+    glBindTexture(GL_TEXTURE_2D, depthTexture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+
+    m_colorToDepthMap.insert(std::make_pair(colorTexture, depthTexture));
+
+    return depthTexture;
+}
+
+template <typename T, size_t Size> // The equivalent of C++17 std::size. A helper to get the dimension for an array.
+constexpr size_t ArraySize(const T (&/*unused*/)[Size]) noexcept { return Size; }
+
+void opengl_render_layer(const XrCompositionLayerProjectionView& layerView, const XrSwapchainImageOpenGLKHR* swapchainImage, const std::vector<Cube>& cubes, int index) {
+        glBindFramebuffer(GL_FRAMEBUFFER, m_swapchainFramebuffer);
+
+        const uint32_t colorTexture = reinterpret_cast<const XrSwapchainImageOpenGLKHR*>(swapchainImage)->image;
+
+        glViewport(static_cast<GLint>(layerView.subImage.imageRect.offset.x),
+                   static_cast<GLint>(layerView.subImage.imageRect.offset.y),
+                   static_cast<GLsizei>(layerView.subImage.imageRect.extent.width),
+                   static_cast<GLsizei>(layerView.subImage.imageRect.extent.height));
+
+        glFrontFace(GL_CW);
+        glCullFace(GL_BACK);
+        glEnable(GL_CULL_FACE);
+        glEnable(GL_DEPTH_TEST);
+
+        const uint32_t depthTexture = GetDepthTexture(colorTexture);
+
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorTexture, 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTexture, 0);
+
+        // Clear swapchain and depth buffer.
+        glClearColor(DarkSlateGray[0], DarkSlateGray[1], DarkSlateGray[2], DarkSlateGray[3]);
+        glClearDepth(1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+        // Set shaders and uniform variables.
+        glUseProgram(m_program);
+
+        const auto& pose = layerView.pose;
+        XrMatrix4x4f proj;
+        XrMatrix4x4f_CreateProjectionFov(&proj, GRAPHICS_OPENGL, layerView.fov, 0.05f, 100.0f);
+        XrMatrix4x4f toView;
+        XrVector3f scale{1.f, 1.f, 1.f};
+        XrMatrix4x4f_CreateTranslationRotationScale(&toView, &pose.position, &pose.orientation, &scale);
+        XrMatrix4x4f view;
+        XrMatrix4x4f_InvertRigidBody(&view, &toView);
+        XrMatrix4x4f vp;
+        XrMatrix4x4f_Multiply(&vp, &proj, &view);
+
+        // Set cube primitive data.
+        glBindVertexArray(m_vao);
+
+        // Render each cube
+        for (const Cube& cube : cubes) {
+            // Compute the model-view-projection transform and set it..
+            XrMatrix4x4f model;
+            XrMatrix4x4f_CreateTranslationRotationScale(&model, &cube.Pose.position, &cube.Pose.orientation, &cube.Scale);
+            XrMatrix4x4f mvp;
+            XrMatrix4x4f_Multiply(&mvp, &vp, &model);
+            glUniformMatrix4fv(m_modelViewProjectionUniformLocation, 1, GL_FALSE, reinterpret_cast<const GLfloat*>(&mvp));
+
+            // Draw the cube.
+            glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(ArraySize(Geometry::c_cubeIndices)), GL_UNSIGNED_SHORT, nullptr);
+        }
+
+        glBindVertexArray(0);
+        glUseProgram(0);
+
+        int32_t width = layerView.subImage.imageRect.extent.width;
+        int32_t height = layerView.subImage.imageRect.extent.height;
+        
+        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+        if (index == 0) {
+            glBlitFramebuffer(0, 0, width, height, 0, 0, window.windowWidth/2, window.windowHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        } else if (index == 1) {
+            glBlitFramebuffer(0, 0, width, height, window.windowWidth/2, 0, window.windowWidth, window.windowHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        }
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+        static int everyOther = 0;
+        if ((everyOther++ & 1) != 0) {
+            ksGpuWindow_SwapBuffers(&window);
+        }
+}
 
 
 
