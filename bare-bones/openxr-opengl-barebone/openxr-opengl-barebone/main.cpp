@@ -10,6 +10,7 @@
 #define SPIRV_VERSION "99"
 #define USE_SYNC_OBJECT 0  // 0 = GLsync, 1 = EGLSyncKHR, 2 = storage buffer
 #define GRAPHICS_API_OPENGL 1
+#define _USE_MATH_DEFINES
 
 #include <windows.h>
 #include <GL/gl.h>
@@ -25,7 +26,7 @@
 #include <algorithm>
 #include <map>
 #include <array>
-
+#include <cmath>
 
 using namespace std;
 
@@ -622,8 +623,6 @@ void ksGpuContext_Destroy(ksGpuContext *context) {
     }
 }
 
-
-
 void ksGpuWindow_Destroy(ksGpuWindow *window) {
     ksGpuContext_Destroy(&window->context);
     ksGpuDevice_Destroy(&window->device);
@@ -654,8 +653,6 @@ void ksGpuWindow_Destroy(ksGpuWindow *window) {
         window->hInstance = NULL;
     }
 }
-
-
 
 static bool ksGpuContext_CreateForSurface(ksGpuContext *context, const ksGpuDevice *device, const int queueIndex,
                                           const ksGpuSurfaceColorFormat colorFormat, const ksGpuSurfaceDepthFormat depthFormat,
@@ -791,9 +788,6 @@ static bool ksGpuContext_CreateForSurface(ksGpuContext *context, const ksGpuDevi
 
     return true;
 }
-
-
-
 
 bool ksGpuWindow_Create(ksGpuWindow *window, ksDriverInstance *instance, const ksGpuQueueInfo *queueInfo, int queueIndex,
                         ksGpuSurfaceColorFormat colorFormat, ksGpuSurfaceDepthFormat depthFormat, ksGpuSampleCount sampleCount,
@@ -943,6 +937,70 @@ void ksGpuWindow_SwapBuffers(ksGpuWindow *window) {
 }
 
 
+class SolidSphere {
+    protected:
+        std::vector<GLfloat> vertices;
+        std::vector<GLfloat> normals;
+        std::vector<GLfloat> texcoords;
+        std::vector<GLushort> indices;
+
+    public:
+        SolidSphere(float radius, unsigned int rings, unsigned int sectors) {
+            float const R = 1./(float)(rings-1);
+            float const S = 1./(float)(sectors-1);
+            int r, s;
+
+            vertices.resize(rings * sectors * 3);
+            normals.resize(rings * sectors * 3);
+            texcoords.resize(rings * sectors * 2);
+            std::vector<GLfloat>::iterator v = vertices.begin();
+            std::vector<GLfloat>::iterator n = normals.begin();
+            std::vector<GLfloat>::iterator t = texcoords.begin();
+            for(r = 0; r < rings; r++) for(s = 0; s < sectors; s++) {
+                    float const y = sin( -M_PI_2 + M_PI * r * R );
+                    float const x = cos(2*M_PI * s * S) * sin( M_PI * r * R );
+                    float const z = sin(2*M_PI * s * S) * sin( M_PI * r * R );
+
+                    *t++ = s*S;
+                    *t++ = r*R;
+
+                    *v++ = x * radius;
+                    *v++ = y * radius;
+                    *v++ = z * radius;
+
+                    *n++ = x;
+                    *n++ = y;
+                    *n++ = z;
+            }
+
+            indices.resize(rings * sectors * 4);
+            std::vector<GLushort>::iterator i = indices.begin();
+            for(r = 0; r < rings; r++) for(s = 0; s < sectors; s++) {
+                    *i++ = r * sectors + s;
+                    *i++ = r * sectors + (s+1);
+                    *i++ = (r+1) * sectors + (s+1);
+                    *i++ = (r+1) * sectors + s;
+            }
+        }
+
+        void draw(GLfloat x, GLfloat y, GLfloat z) {
+            glMatrixMode(GL_MODELVIEW);
+            glPushMatrix();
+            glTranslatef(x,y,z);
+
+            glEnableClientState(GL_VERTEX_ARRAY);
+            glEnableClientState(GL_NORMAL_ARRAY);
+            glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+
+            glVertexPointer(3, GL_FLOAT, 0, &vertices[0]);
+            glNormalPointer(GL_FLOAT, 0, &normals[0]);
+            glTexCoordPointer(2, GL_FLOAT, 0, &texcoords[0]);
+            glDrawElements(GL_QUADS, indices.size(), GL_UNSIGNED_SHORT, &indices[0]);
+            glPopMatrix();
+        }
+};
+
+SolidSphere* sphere = new SolidSphere(1, 12, 24);
 
 
 
@@ -1002,7 +1060,7 @@ void ksGpuWindow_SwapBuffers(ksGpuWindow *window) {
 
 
 
-
+class SolidSphere;
 
 struct Cube {
     XrPosef Pose;
@@ -1050,6 +1108,7 @@ XrSystemId     xr_system_id     = XR_NULL_SYSTEM_ID;
 input_state_t  xr_input         = { };
 XrEnvironmentBlendMode   xr_blend = {};
 XrDebugUtilsMessengerEXT xr_debug = {};
+XrSpaceLocation xr_fixed_space = {};
 
 vector<XrView>                  xr_views;
 vector<XrViewConfigurationView> xr_config_views;
@@ -1417,6 +1476,7 @@ bool openxr_render_layer(XrTime predictedDisplayTime, vector<XrCompositionLayerP
                 (spaceLocation.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) != 0) {
                 cubes.push_back(Cube{spaceLocation.pose, {0.25f, 0.25f, 0.25f}});
             }
+            xr_fixed_space = spaceLocation;
         } else {
             printf("Unable to locate a visualized reference space in app space: %d", res);
         }
@@ -1565,8 +1625,11 @@ GLint m_modelViewProjectionUniformLocation{0};
 GLint m_vertexAttribCoords{0};
 GLint m_vertexAttribColor{0};
 GLuint m_vao{0};
+GLuint m_vao1{0};
 GLuint m_cubeVertexBuffer{0};
 GLuint m_cubeIndexBuffer{0};
+GLuint m_planeVertexBuffer{0};
+GLuint m_planeIndexBuffer{0};
 std::map<uint32_t, uint32_t> m_colorToDepthMap;
 
 constexpr float DarkSlateGray[] = {0.184313729f, 0.309803933f, 0.309803933f, 1.0f};
@@ -1631,6 +1694,9 @@ namespace Geometry {
         24, 25, 26, 27, 28, 29,  // -Z
         30, 31, 32, 33, 34, 35,  // +Z
     };
+
+    constexpr Vertex c_planeVertices[] = { CUBE_SIDE(LBB, LBF, RBF, LBB, RBF, RBB, DarkGreen) };
+    constexpr unsigned short c_planeIndices[] = { 0,  1,  2,  3,  4,  5 };
 }
 
 void CheckShader(GLuint shader) {
@@ -1685,17 +1751,31 @@ void opengl_init() {
         glGenBuffers(1, &m_cubeVertexBuffer);
         glBindBuffer(GL_ARRAY_BUFFER, m_cubeVertexBuffer);
         glBufferData(GL_ARRAY_BUFFER, sizeof(Geometry::c_cubeVertices), Geometry::c_cubeVertices, GL_STATIC_DRAW);
-
         glGenBuffers(1, &m_cubeIndexBuffer);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_cubeIndexBuffer);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(Geometry::c_cubeIndices), Geometry::c_cubeIndices, GL_STATIC_DRAW);
-
         glGenVertexArrays(1, &m_vao);
         glBindVertexArray(m_vao);
         glEnableVertexAttribArray(m_vertexAttribCoords);
         glEnableVertexAttribArray(m_vertexAttribColor);
         glBindBuffer(GL_ARRAY_BUFFER, m_cubeVertexBuffer);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_cubeIndexBuffer);
+        glVertexAttribPointer(m_vertexAttribCoords, 3, GL_FLOAT, GL_FALSE, sizeof(Geometry::Vertex), nullptr);
+        glVertexAttribPointer(m_vertexAttribColor, 3, GL_FLOAT, GL_FALSE, sizeof(Geometry::Vertex), reinterpret_cast<const void*>(sizeof(XrVector3f)));
+
+
+        glGenBuffers(1, &m_planeVertexBuffer);
+        glBindBuffer(GL_ARRAY_BUFFER, m_planeVertexBuffer);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(Geometry::c_planeVertices), Geometry::c_planeVertices, GL_STATIC_DRAW);
+        glGenBuffers(1, &m_planeIndexBuffer);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_planeIndexBuffer);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(Geometry::c_planeIndices), Geometry::c_planeIndices, GL_STATIC_DRAW);
+        glGenVertexArrays(1, &m_vao1);
+        glBindVertexArray(m_vao1);
+        glEnableVertexAttribArray(m_vertexAttribCoords);
+        glEnableVertexAttribArray(m_vertexAttribColor);
+        glBindBuffer(GL_ARRAY_BUFFER, m_planeVertexBuffer);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_planeIndexBuffer);
         glVertexAttribPointer(m_vertexAttribCoords, 3, GL_FLOAT, GL_FALSE, sizeof(Geometry::Vertex), nullptr);
         glVertexAttribPointer(m_vertexAttribColor, 3, GL_FLOAT, GL_FALSE, sizeof(Geometry::Vertex), reinterpret_cast<const void*>(sizeof(XrVector3f)));
 }
@@ -1768,15 +1848,24 @@ void opengl_render_layer(const XrCompositionLayerProjectionView& layerView, cons
 
         glBindVertexArray(m_vao);
 
+        XrMatrix4x4f model;
+        XrMatrix4x4f mvp;
+
+        //plane
+        XrMatrix4x4f_CreateTranslationRotationScale(&model, &xr_fixed_space.pose.position, &xr_fixed_space.pose.orientation, &scale);
+        XrMatrix4x4f_Multiply(&mvp, &vp, &model);
+        glUniformMatrix4fv(m_modelViewProjectionUniformLocation, 1, GL_FALSE, reinterpret_cast<const GLfloat*>(&mvp));
+        glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(ArraySize(Geometry::c_planeIndices)), GL_UNSIGNED_SHORT, nullptr);
+
+        //cube
         for (const Cube& cube : cubes) {
-            XrMatrix4x4f model;
             XrMatrix4x4f_CreateTranslationRotationScale(&model, &cube.Pose.position, &cube.Pose.orientation, &cube.Scale);
-            XrMatrix4x4f mvp;
             XrMatrix4x4f_Multiply(&mvp, &vp, &model);
             glUniformMatrix4fv(m_modelViewProjectionUniformLocation, 1, GL_FALSE, reinterpret_cast<const GLfloat*>(&mvp));
-
             glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(ArraySize(Geometry::c_cubeIndices)), GL_UNSIGNED_SHORT, nullptr);
         }
+       
+        //sphere->draw(0, 0, -1); //sphere
 
         glBindVertexArray(0);
         glUseProgram(0);
@@ -1812,6 +1901,18 @@ void opengl_shutdown() {
         }
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
