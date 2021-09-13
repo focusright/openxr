@@ -1624,8 +1624,8 @@ GLuint m_program{0};
 GLint m_modelViewProjectionUniformLocation{0};
 GLint m_vertexAttribCoords{0};
 GLint m_vertexAttribColor{0};
-GLuint m_vao{0};
-GLuint m_vao1{0};
+GLuint m_vao_cube{0};
+GLuint m_vao_plane{0};
 GLuint m_cubeVertexBuffer{0};
 GLuint m_cubeIndexBuffer{0};
 GLuint m_planeVertexBuffer{0};
@@ -1753,8 +1753,8 @@ void opengl_init() {
         glGenBuffers(1, &m_planeIndexBuffer);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_planeIndexBuffer);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(Geometry::c_planeIndices), Geometry::c_planeIndices, GL_STATIC_DRAW);
-        glGenVertexArrays(1, &m_vao1);
-        glBindVertexArray(m_vao1);
+        glGenVertexArrays(1, &m_vao_plane);
+        glBindVertexArray(m_vao_plane);
         glBindBuffer(GL_ARRAY_BUFFER, m_planeVertexBuffer);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_planeIndexBuffer);
 
@@ -1767,8 +1767,8 @@ void opengl_init() {
         glGenBuffers(1, &m_cubeIndexBuffer);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_cubeIndexBuffer);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(Geometry::c_cubeIndices), Geometry::c_cubeIndices, GL_STATIC_DRAW);
-        glGenVertexArrays(1, &m_vao);
-        glBindVertexArray(m_vao);
+        glGenVertexArrays(1, &m_vao_cube);
+        glBindVertexArray(m_vao_cube);
         glBindBuffer(GL_ARRAY_BUFFER, m_cubeVertexBuffer);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_cubeIndexBuffer);
 }
@@ -1842,8 +1842,8 @@ void opengl_render_layer(const XrCompositionLayerProjectionView& layerView, cons
         XrMatrix4x4f vp;
         XrMatrix4x4f_Multiply(&vp, &proj, &view);
 
-        glBindVertexArray(m_vao);
-        glBindVertexArray(m_vao1);
+        glBindVertexArray(m_vao_cube);
+        glBindVertexArray(m_vao_plane);
 
         XrMatrix4x4f model;
         XrMatrix4x4f mvp;
@@ -1899,8 +1899,8 @@ void opengl_render_layer(const XrCompositionLayerProjectionView& layerView, cons
 void opengl_shutdown() {
     glDeleteFramebuffers(1, &m_swapchainFramebuffer);
     glDeleteProgram(m_program);
-    glDeleteVertexArrays(1, &m_vao);
-    glDeleteVertexArrays(1, &m_vao1);
+    glDeleteVertexArrays(1, &m_vao_cube);
+    glDeleteVertexArrays(1, &m_vao_plane);
     glDeleteBuffers(1, &m_planeVertexBuffer);
     glDeleteBuffers(1, &m_planeIndexBuffer);
     glDeleteBuffers(1, &m_cubeVertexBuffer);
