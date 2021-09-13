@@ -1705,20 +1705,19 @@ namespace Geometry {
     constexpr Vertex c_planeVertices[] = { CUBE_SIDE(LTB, RTB, RTF, LTB, RTF, LTF, DarkGreen) };
     constexpr unsigned short c_planeIndices[] = { 0,  1,  2,  3,  4,  5 };
 
+    //Single triangle as a placeholder for sphere
     //constexpr Vertex c_sphereVertices[] = { TRIANGLE_SIDE(LBF, LTF, RTF, MidRed) };
     //constexpr unsigned short c_sphereIndices[] = { 0,  1,  2 };
 
+    //icosahedron for a sphere
     float X=.525731112119133606f;
     float Z=.850650808352039932f;
     float N=0.f;
-    XrVector3f color = MidRed;
-
     const Vertex c_sphereVertices[] = {
-        {{-X,N,Z},color}, {{X,N,Z},color}, {{-X,N,-Z},color}, {{X,N,-Z},color},
-        {{N,Z,X},color}, {{N,Z,-X},color}, {{N,-Z,X},color}, {{N,-Z,-X},color},
-        {{Z,X,N},color}, {{-Z,X, N},color}, {{Z,-X,N},color}, {{-Z,-X, N},color}
+        {{-X,N,Z},MidRed}, {{X,N,Z},MidBlue}, {{-X,N,-Z},MidRed}, {{X,N,-Z},MidBlue},
+        {{N,Z,X},MidRed}, {{N,Z,-X},MidBlue}, {{N,-Z,X},MidRed}, {{N,-Z,-X},MidBlue},
+        {{Z,X,N},MidRed}, {{-Z,X, N},MidBlue}, {{Z,-X,N},MidRed}, {{-Z,-X, N},MidBlue}
     };
- 
     constexpr unsigned short c_sphereIndices[] = {
         0,4,1,0,9,4,9,5,4,4,5,8,4,8,1,
         8,10,1,8,3,10,5,3,8,5,2,3,2,7,3,
