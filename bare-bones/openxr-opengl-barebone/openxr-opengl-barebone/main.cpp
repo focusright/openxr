@@ -1685,7 +1685,6 @@ namespace Geometry {
         CUBE_SIDE(LBB, RBB, RTB, LBB, RTB, LTB, DarkBlue)   // -Z
         CUBE_SIDE(LBF, LTF, RTF, LBF, RTF, RBF, Blue)       // +Z
     };
-
     constexpr unsigned short c_cubeIndices[] = { // Winding order is clockwise. Each side uses a different color.
         0,  1,  2,  3,  4,  5,   // -X
         6,  7,  8,  9,  10, 11,  // +X
@@ -1695,7 +1694,7 @@ namespace Geometry {
         30, 31, 32, 33, 34, 35,  // +Z
     };
 
-    constexpr Vertex c_planeVertices[] = { CUBE_SIDE(LBB, LBF, RBF, LBB, RBF, RBB, DarkGreen) };
+    constexpr Vertex c_planeVertices[] = { CUBE_SIDE(LTB, RTB, RTF, LTB, RTF, LTF, DarkGreen) };
     constexpr unsigned short c_planeIndices[] = { 0,  1,  2,  3,  4,  5 };
 }
 
@@ -1746,23 +1745,7 @@ void opengl_init() {
         m_modelViewProjectionUniformLocation = glGetUniformLocation(m_program, "ModelViewProjection");
 
         m_vertexAttribCoords = glGetAttribLocation(m_program, "VertexPos");
-        m_vertexAttribColor = glGetAttribLocation(m_program, "VertexColor");
-
-        glGenBuffers(1, &m_cubeVertexBuffer);
-        glBindBuffer(GL_ARRAY_BUFFER, m_cubeVertexBuffer);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(Geometry::c_cubeVertices), Geometry::c_cubeVertices, GL_STATIC_DRAW);
-        glGenBuffers(1, &m_cubeIndexBuffer);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_cubeIndexBuffer);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(Geometry::c_cubeIndices), Geometry::c_cubeIndices, GL_STATIC_DRAW);
-        glGenVertexArrays(1, &m_vao);
-        glBindVertexArray(m_vao);
-        glEnableVertexAttribArray(m_vertexAttribCoords);
-        glEnableVertexAttribArray(m_vertexAttribColor);
-        glBindBuffer(GL_ARRAY_BUFFER, m_cubeVertexBuffer);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_cubeIndexBuffer);
-        glVertexAttribPointer(m_vertexAttribCoords, 3, GL_FLOAT, GL_FALSE, sizeof(Geometry::Vertex), nullptr);
-        glVertexAttribPointer(m_vertexAttribColor, 3, GL_FLOAT, GL_FALSE, sizeof(Geometry::Vertex), reinterpret_cast<const void*>(sizeof(XrVector3f)));
-
+        m_vertexAttribColor  = glGetAttribLocation(m_program, "VertexColor");
 
         glGenBuffers(1, &m_planeVertexBuffer);
         glBindBuffer(GL_ARRAY_BUFFER, m_planeVertexBuffer);
@@ -1772,12 +1755,26 @@ void opengl_init() {
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(Geometry::c_planeIndices), Geometry::c_planeIndices, GL_STATIC_DRAW);
         glGenVertexArrays(1, &m_vao1);
         glBindVertexArray(m_vao1);
-        glEnableVertexAttribArray(m_vertexAttribCoords);
-        glEnableVertexAttribArray(m_vertexAttribColor);
         glBindBuffer(GL_ARRAY_BUFFER, m_planeVertexBuffer);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_planeIndexBuffer);
+
+        //glGenBuffers(1, &m_cubeVertexBuffer);
+        //glBindBuffer(GL_ARRAY_BUFFER, m_cubeVertexBuffer);
+        //glBufferData(GL_ARRAY_BUFFER, sizeof(Geometry::c_cubeVertices), Geometry::c_cubeVertices, GL_STATIC_DRAW);
+        //glGenBuffers(1, &m_cubeIndexBuffer);
+        //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_cubeIndexBuffer);
+        //glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(Geometry::c_cubeIndices), Geometry::c_cubeIndices, GL_STATIC_DRAW);
+        //glGenVertexArrays(1, &m_vao);
+        //glBindVertexArray(m_vao);
+        //glBindBuffer(GL_ARRAY_BUFFER, m_cubeVertexBuffer);
+        //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_cubeIndexBuffer);
+
         glVertexAttribPointer(m_vertexAttribCoords, 3, GL_FLOAT, GL_FALSE, sizeof(Geometry::Vertex), nullptr);
         glVertexAttribPointer(m_vertexAttribColor, 3, GL_FLOAT, GL_FALSE, sizeof(Geometry::Vertex), reinterpret_cast<const void*>(sizeof(XrVector3f)));
+
+        glEnableVertexAttribArray(m_vertexAttribCoords);
+        glEnableVertexAttribArray(m_vertexAttribColor);
+
 }
 
 uint32_t GetDepthTexture(uint32_t colorTexture) {
@@ -1840,6 +1837,9 @@ void opengl_render_layer(const XrCompositionLayerProjectionView& layerView, cons
         XrMatrix4x4f_CreateProjectionFov(&proj, GRAPHICS_OPENGL, layerView.fov, 0.05f, 100.0f);
         XrMatrix4x4f toView;
         XrVector3f scale{1.f, 1.f, 1.f};
+        XrVector3f zero_vector{ 0.f, 0.f, 0.f};
+        XrQuaternionf zero_quaternion{ 0.f, 0.f, 0.f, 0.f};
+
         XrMatrix4x4f_CreateTranslationRotationScale(&toView, &pose.position, &pose.orientation, &scale);
         XrMatrix4x4f view;
         XrMatrix4x4f_InvertRigidBody(&view, &toView);
@@ -1847,23 +1847,47 @@ void opengl_render_layer(const XrCompositionLayerProjectionView& layerView, cons
         XrMatrix4x4f_Multiply(&vp, &proj, &view);
 
         glBindVertexArray(m_vao);
+        glBindVertexArray(m_vao1);
 
         XrMatrix4x4f model;
         XrMatrix4x4f mvp;
 
+        
+        XrVector3f plane_scale{5.f, 5.f, 5.f};
+        XrVector3f plane_position{0.f, -4.f, 0.f};
+
         //plane
-        XrMatrix4x4f_CreateTranslationRotationScale(&model, &xr_fixed_space.pose.position, &xr_fixed_space.pose.orientation, &scale);
+        glBindBuffer(GL_ARRAY_BUFFER, m_planeVertexBuffer);
+        glVertexAttribPointer(m_vertexAttribCoords, 3, GL_FLOAT, GL_FALSE, sizeof(Geometry::Vertex), nullptr);
+        glVertexAttribPointer(m_vertexAttribColor, 3, GL_FLOAT, GL_FALSE, sizeof(Geometry::Vertex), reinterpret_cast<const void*>(sizeof(XrVector3f)));
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_planeIndexBuffer);
+        XrMatrix4x4f_CreateTranslationRotationScale(&model, &plane_position, &zero_quaternion, &plane_scale);
         XrMatrix4x4f_Multiply(&mvp, &vp, &model);
         glUniformMatrix4fv(m_modelViewProjectionUniformLocation, 1, GL_FALSE, reinterpret_cast<const GLfloat*>(&mvp));
         glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(ArraySize(Geometry::c_planeIndices)), GL_UNSIGNED_SHORT, nullptr);
 
+        //glBindBuffer(GL_ARRAY_BUFFER, m_cubeVertexBuffer);
+        //glVertexAttribPointer(m_vertexAttribCoords, 3, GL_FLOAT, GL_FALSE, sizeof(Geometry::Vertex), nullptr);
+        //glVertexAttribPointer(m_vertexAttribColor, 3, GL_FLOAT, GL_FALSE, sizeof(Geometry::Vertex), reinterpret_cast<const void*>(sizeof(XrVector3f)));
+        //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_cubeIndexBuffer);
+        //XrMatrix4x4f_CreateTranslationRotationScale(&model, &xr_fixed_space.pose.position, &xr_fixed_space.pose.orientation, &scale);
+        //XrMatrix4x4f_Multiply(&mvp, &vp, &model);
+        //glUniformMatrix4fv(m_modelViewProjectionUniformLocation, 1, GL_FALSE, reinterpret_cast<const GLfloat*>(&mvp));
+        //glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(ArraySize(Geometry::c_cubeIndices)), GL_UNSIGNED_SHORT, nullptr);
+
         //cube
-        for (const Cube& cube : cubes) {
-            XrMatrix4x4f_CreateTranslationRotationScale(&model, &cube.Pose.position, &cube.Pose.orientation, &cube.Scale);
-            XrMatrix4x4f_Multiply(&mvp, &vp, &model);
-            glUniformMatrix4fv(m_modelViewProjectionUniformLocation, 1, GL_FALSE, reinterpret_cast<const GLfloat*>(&mvp));
-            glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(ArraySize(Geometry::c_cubeIndices)), GL_UNSIGNED_SHORT, nullptr);
-        }
+        //glBindBuffer(GL_ARRAY_BUFFER, m_cubeVertexBuffer);
+        //glVertexAttribPointer(m_vertexAttribCoords, 3, GL_FLOAT, GL_FALSE, sizeof(Geometry::Vertex), nullptr);
+        //glVertexAttribPointer(m_vertexAttribColor, 3, GL_FLOAT, GL_FALSE, sizeof(Geometry::Vertex), reinterpret_cast<const void*>(sizeof(XrVector3f)));
+        //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_cubeIndexBuffer);
+        //for (const Cube& cube : cubes) {
+        //    XrMatrix4x4f_CreateTranslationRotationScale(&model, &cube.Pose.position, &cube.Pose.orientation, &cube.Scale);
+        //    XrMatrix4x4f_Multiply(&mvp, &vp, &model);
+        //    glUniformMatrix4fv(m_modelViewProjectionUniformLocation, 1, GL_FALSE, reinterpret_cast<const GLfloat*>(&mvp));
+        //    glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(ArraySize(Geometry::c_cubeIndices)), GL_UNSIGNED_SHORT, nullptr);
+        //}
+
+        //printf("%d", cubes.size());
        
         //sphere->draw(0, 0, -1); //sphere
 
@@ -1892,8 +1916,12 @@ void opengl_shutdown() {
     glDeleteFramebuffers(1, &m_swapchainFramebuffer);
     glDeleteProgram(m_program);
     glDeleteVertexArrays(1, &m_vao);
+    glDeleteVertexArrays(1, &m_vao1);
+    glDeleteBuffers(1, &m_planeVertexBuffer);
+    glDeleteBuffers(1, &m_planeIndexBuffer);
     glDeleteBuffers(1, &m_cubeVertexBuffer);
     glDeleteBuffers(1, &m_cubeIndexBuffer);
+
 
     for (auto& colorToDepth : m_colorToDepthMap) {
         if (colorToDepth.second != 0) {
