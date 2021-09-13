@@ -1662,6 +1662,9 @@ namespace Geometry {
         XrVector3f Color;
     };
 
+    constexpr XrVector3f Black{0, 0, 0};
+    constexpr XrVector3f White{1, 1, 1};
+    constexpr XrVector3f Grey{.5f, .5f, .5f};
     constexpr XrVector3f Red{1, 0, 0};
     constexpr XrVector3f MidRed{0.5f, 0, 0};
     constexpr XrVector3f DarkRed{0.25f, 0, 0};
@@ -1714,9 +1717,9 @@ namespace Geometry {
     float Z=.850650808352039932f;
     float N=0.f;
     const Vertex c_sphereVertices[] = {
-        {{-X,N,Z},MidRed}, {{X,N,Z},MidBlue}, {{-X,N,-Z},MidRed}, {{X,N,-Z},MidBlue},
-        {{N,Z,X},MidRed}, {{N,Z,-X},MidBlue}, {{N,-Z,X},MidRed}, {{N,-Z,-X},MidBlue},
-        {{Z,X,N},MidRed}, {{-Z,X, N},MidBlue}, {{Z,-X,N},MidRed}, {{-Z,-X, N},MidBlue}
+        {{-X,N,Z},Red}, {{X,N,Z},Green}, {{-X,N,-Z},Blue}, {{X,N,-Z},White},
+        {{N,Z,X},MidRed}, {{N,Z,-X},MidGreen}, {{N,-Z,X},MidBlue}, {{N,-Z,-X},Grey},
+        {{Z,X,N},DarkRed}, {{-Z,X, N},DarkBlue}, {{Z,-X,N},DarkRed}, {{-Z,-X, N},Black}
     };
     constexpr unsigned short c_sphereIndices[] = {
         0,4,1,0,9,4,9,5,4,4,5,8,4,8,1,
