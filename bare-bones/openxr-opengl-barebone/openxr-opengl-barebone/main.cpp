@@ -1626,10 +1626,13 @@ GLint m_vertexAttribCoords{0};
 GLint m_vertexAttribColor{0};
 GLuint m_vao_plane{0};
 GLuint m_vao_cube{0};
+GLuint m_vao_sphere{0};
 GLuint m_cubeVertexBuffer{0};
 GLuint m_cubeIndexBuffer{0};
 GLuint m_planeVertexBuffer{0};
 GLuint m_planeIndexBuffer{0};
+GLuint m_sphereVertexBuffer{0};
+GLuint m_sphereIndexBuffer{0};
 std::map<uint32_t, uint32_t> m_colorToDepthMap;
 
 constexpr float DarkSlateGray[] = {0.184313729f, 0.309803933f, 0.309803933f, 1.0f};
@@ -1660,10 +1663,13 @@ namespace Geometry {
     };
 
     constexpr XrVector3f Red{1, 0, 0};
+    constexpr XrVector3f MidRed{0.5f, 0, 0};
     constexpr XrVector3f DarkRed{0.25f, 0, 0};
     constexpr XrVector3f Green{0, 1, 0};
+    constexpr XrVector3f MidGreen{0, 0.5f, 0};
     constexpr XrVector3f DarkGreen{0, 0.25f, 0};
     constexpr XrVector3f Blue{0, 0, 1};
+    constexpr XrVector3f MidBlue{0, 0, 0.5f};
     constexpr XrVector3f DarkBlue{0, 0, 0.25f};
 
     constexpr XrVector3f LBB{-0.5f, -0.5f, -0.5f}; // Vertices for a 1x1x1 meter cube. (Left/Right, Top/Bottom, Front/Back)
@@ -1677,10 +1683,12 @@ namespace Geometry {
 
     #define CUBE_SIDE(V1, V2, V3, V4, V5, V6, COLOR) {V1, COLOR}, {V2, COLOR}, {V3, COLOR}, {V4, COLOR}, {V5, COLOR}, {V6, COLOR},
 
+    #define TRIANGLE_SIDE(V1, V2, V3, COLOR) {V1, COLOR}, {V2, COLOR}, {V3, COLOR},
+
     constexpr Vertex c_cubeVertices[] = {
         CUBE_SIDE(LTB, LBF, LBB, LTB, LTF, LBF, DarkRed)    // -X
         CUBE_SIDE(RTB, RBB, RBF, RTB, RBF, RTF, Red)        // +X
-        CUBE_SIDE(LBB, LBF, RBF, LBB, RBF, RBB, DarkGreen)  // -Y
+        CUBE_SIDE(LBB, LBF, RBF, LBB, RBF, RBB, MidGreen)  // -Y
         CUBE_SIDE(LTB, RTB, RTF, LTB, RTF, LTF, Green)      // +Y
         CUBE_SIDE(LBB, RBB, RTB, LBB, RTB, LTB, DarkBlue)   // -Z
         CUBE_SIDE(LBF, LTF, RTF, LBF, RTF, RBF, Blue)       // +Z
@@ -1696,6 +1704,9 @@ namespace Geometry {
 
     constexpr Vertex c_planeVertices[] = { CUBE_SIDE(LTB, RTB, RTF, LTB, RTF, LTF, DarkGreen) };
     constexpr unsigned short c_planeIndices[] = { 0,  1,  2,  3,  4,  5 };
+
+    constexpr Vertex c_sphereVertices[] = { TRIANGLE_SIDE(LBF, LTF, RTF, MidRed) };
+    constexpr unsigned short c_sphereIndices[] = { 0,  1,  2 };
 }
 
 void CheckShader(GLuint shader) {
@@ -1771,6 +1782,20 @@ void opengl_init() {
         glBindVertexArray(m_vao_cube);
         glBindBuffer(GL_ARRAY_BUFFER, m_cubeVertexBuffer);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_cubeIndexBuffer);
+
+        //glEnableVertexAttribArray(m_vertexAttribCoords);
+        //glEnableVertexAttribArray(m_vertexAttribColor);
+
+        glGenBuffers(1, &m_sphereVertexBuffer);
+        glBindBuffer(GL_ARRAY_BUFFER, m_sphereVertexBuffer);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(Geometry::c_sphereVertices), Geometry::c_sphereVertices, GL_STATIC_DRAW);
+        glGenBuffers(1, &m_sphereIndexBuffer);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_sphereIndexBuffer);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(Geometry::c_sphereIndices), Geometry::c_sphereIndices, GL_STATIC_DRAW);
+        glGenVertexArrays(1, &m_vao_sphere);
+        glBindVertexArray(m_vao_sphere);
+        glBindBuffer(GL_ARRAY_BUFFER, m_sphereVertexBuffer);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_sphereIndexBuffer);
 }
 
 uint32_t GetDepthTexture(uint32_t colorTexture) {
@@ -1842,16 +1867,17 @@ void opengl_render_layer(const XrCompositionLayerProjectionView& layerView, cons
         XrMatrix4x4f vp;
         XrMatrix4x4f_Multiply(&vp, &proj, &view);
 
+        glBindVertexArray(m_vao_sphere);
         glBindVertexArray(m_vao_cube);
         glBindVertexArray(m_vao_plane); //This order needs to be reversed for some reason
 
         XrMatrix4x4f model;
         XrMatrix4x4f mvp;
         
+        //plane
         XrVector3f plane_scale{5.f, 5.f, 5.f};
         XrVector3f plane_position{0.f, -4.f, 0.f};
 
-        //plane
         glBindBuffer(GL_ARRAY_BUFFER, m_planeVertexBuffer);
         glVertexAttribPointer(m_vertexAttribCoords, 3, GL_FLOAT, GL_FALSE, sizeof(Geometry::Vertex), nullptr);
         glVertexAttribPointer(m_vertexAttribColor, 3, GL_FLOAT, GL_FALSE, sizeof(Geometry::Vertex), reinterpret_cast<const void*>(sizeof(XrVector3f)));
@@ -1873,7 +1899,17 @@ void opengl_render_layer(const XrCompositionLayerProjectionView& layerView, cons
             glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(ArraySize(Geometry::c_cubeIndices)), GL_UNSIGNED_SHORT, nullptr);
         }
 
-        //sphere->draw(0, 0, -1); //sphere
+        //sphere
+        XrVector3f sphere_scale{.25f, .25f, .25f};
+        XrVector3f sphere_position{.5f, 0.f, -1.f};
+        glBindBuffer(GL_ARRAY_BUFFER, m_sphereVertexBuffer);
+        glVertexAttribPointer(m_vertexAttribCoords, 3, GL_FLOAT, GL_FALSE, sizeof(Geometry::Vertex), nullptr);
+        glVertexAttribPointer(m_vertexAttribColor, 3, GL_FLOAT, GL_FALSE, sizeof(Geometry::Vertex), reinterpret_cast<const void*>(sizeof(XrVector3f)));
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_sphereIndexBuffer);
+        XrMatrix4x4f_CreateTranslationRotationScale(&model, &sphere_position, &zero_quaternion, &sphere_scale);
+        XrMatrix4x4f_Multiply(&mvp, &vp, &model);
+        glUniformMatrix4fv(m_modelViewProjectionUniformLocation, 1, GL_FALSE, reinterpret_cast<const GLfloat*>(&mvp));
+        glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(ArraySize(Geometry::c_sphereIndices)), GL_UNSIGNED_SHORT, nullptr);
 
         glUseProgram(0);
 
@@ -1900,11 +1936,13 @@ void opengl_shutdown() {
     glDeleteProgram(m_program);
     glDeleteVertexArrays(1, &m_vao_plane);
     glDeleteVertexArrays(1, &m_vao_cube);
+    glDeleteVertexArrays(1, &m_vao_sphere);
     glDeleteBuffers(1, &m_planeVertexBuffer);
     glDeleteBuffers(1, &m_planeIndexBuffer);
     glDeleteBuffers(1, &m_cubeVertexBuffer);
     glDeleteBuffers(1, &m_cubeIndexBuffer);
-
+    glDeleteBuffers(1, &m_sphereVertexBuffer);
+    glDeleteBuffers(1, &m_sphereIndexBuffer);
 
     for (auto& colorToDepth : m_colorToDepthMap) {
         if (colorToDepth.second != 0) {
