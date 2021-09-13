@@ -1624,8 +1624,8 @@ GLuint m_program{0};
 GLint m_modelViewProjectionUniformLocation{0};
 GLint m_vertexAttribCoords{0};
 GLint m_vertexAttribColor{0};
-GLuint m_vao_cube{0};
 GLuint m_vao_plane{0};
+GLuint m_vao_cube{0};
 GLuint m_cubeVertexBuffer{0};
 GLuint m_cubeIndexBuffer{0};
 GLuint m_planeVertexBuffer{0};
@@ -1843,7 +1843,7 @@ void opengl_render_layer(const XrCompositionLayerProjectionView& layerView, cons
         XrMatrix4x4f_Multiply(&vp, &proj, &view);
 
         glBindVertexArray(m_vao_cube);
-        glBindVertexArray(m_vao_plane);
+        glBindVertexArray(m_vao_plane); //This order needs to be reversed for some reason
 
         XrMatrix4x4f model;
         XrMatrix4x4f mvp;
@@ -1875,7 +1875,6 @@ void opengl_render_layer(const XrCompositionLayerProjectionView& layerView, cons
 
         //sphere->draw(0, 0, -1); //sphere
 
-        glBindVertexArray(0);
         glUseProgram(0);
 
         int32_t width = layerView.subImage.imageRect.extent.width;
@@ -1899,8 +1898,8 @@ void opengl_render_layer(const XrCompositionLayerProjectionView& layerView, cons
 void opengl_shutdown() {
     glDeleteFramebuffers(1, &m_swapchainFramebuffer);
     glDeleteProgram(m_program);
-    glDeleteVertexArrays(1, &m_vao_cube);
     glDeleteVertexArrays(1, &m_vao_plane);
+    glDeleteVertexArrays(1, &m_vao_cube);
     glDeleteBuffers(1, &m_planeVertexBuffer);
     glDeleteBuffers(1, &m_planeIndexBuffer);
     glDeleteBuffers(1, &m_cubeVertexBuffer);
