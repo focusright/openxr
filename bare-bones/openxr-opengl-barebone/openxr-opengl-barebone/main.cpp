@@ -34,27 +34,12 @@ using namespace std;
 
 typedef INT_PTR (WINAPI *PROC)();
 
-typedef enum {
-    KS_GPU_QUEUE_PROPERTY_GRAPHICS = BIT(0),
-    KS_GPU_QUEUE_PROPERTY_COMPUTE = BIT(1),
-    KS_GPU_QUEUE_PROPERTY_TRANSFER = BIT(2)
-} ksGpuQueueProperty;
-
-typedef enum { KS_GPU_QUEUE_PRIORITY_LOW, KS_GPU_QUEUE_PRIORITY_MEDIUM, KS_GPU_QUEUE_PRIORITY_HIGH } ksGpuQueuePriority;
-
 typedef struct {
     int placeholder;
 } ksDriverInstance;
 
 typedef struct {
-    int queueCount;                                  // number of queues
-    ksGpuQueueProperty queueProperties;              // desired queue family properties
-    ksGpuQueuePriority queuePriorities[MAX_QUEUES];  // individual queue priorities
-} ksGpuQueueInfo;
-
-typedef struct {
     ksDriverInstance *instance;
-    ksGpuQueueInfo queueInfo;
 } ksGpuDevice;
 
 typedef struct {
@@ -105,33 +90,33 @@ PFNGLUSEPROGRAMPROC               glUseProgram              ;
 PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB;
 
 void GlInitExtensions() {
-    glAttachShader            = glAttachShader = (PFNGLATTACHSHADERPROC)GetExtension("glAttachShader");
-    glBlitFramebuffer         = glBlitFramebuffer = (PFNGLBLITFRAMEBUFFERPROC)GetExtension("glBlitFramebuffer");
-    glBindBuffer              = glBindBuffer = (PFNGLBINDBUFFERPROC)GetExtension("glBindBuffer");
-    glBufferData              = glBufferData = (PFNGLBUFFERDATAPROC)GetExtension("glBufferData");
-    glBindFramebuffer         = glBindFramebuffer = (PFNGLBINDFRAMEBUFFERPROC)GetExtension("glBindFramebuffer");
-    glBindVertexArray         = glBindVertexArray = (PFNGLBINDVERTEXARRAYPROC)GetExtension("glBindVertexArray");
-    glCompileShader           = glCompileShader = (PFNGLCOMPILESHADERPROC)GetExtension("glCompileShader");
-    glCreateProgram           = glCreateProgram = (PFNGLCREATEPROGRAMPROC)GetExtension("glCreateProgram");
-    glCreateShader            = glCreateShader = (PFNGLCREATESHADERPROC)GetExtension("glCreateShader");
-    glDeleteBuffers           = glDeleteBuffers = (PFNGLDELETEBUFFERSPROC)GetExtension("glDeleteBuffers");
-    glDeleteFramebuffers      = glDeleteFramebuffers = (PFNGLDELETEFRAMEBUFFERSPROC)GetExtension("glDeleteFramebuffers");
-    glDeleteProgram           = glDeleteProgram = (PFNGLDELETEPROGRAMPROC)GetExtension("glDeleteProgram");
-    glDeleteShader            = glDeleteShader = (PFNGLDELETESHADERPROC)GetExtension("glDeleteShader");
-    glDeleteVertexArrays      = glDeleteVertexArrays = (PFNGLDELETEVERTEXARRAYSPROC)GetExtension("glDeleteVertexArrays");
-    glEnableVertexAttribArray = glEnableVertexAttribArray = (PFNGLENABLEVERTEXATTRIBARRAYPROC)GetExtension("glEnableVertexAttribArray");
-    glFramebufferTexture2D    = glFramebufferTexture2D = (PFNGLFRAMEBUFFERTEXTURE2DPROC)GetExtension("glFramebufferTexture2D");
-    glGetAttribLocation       = glGetAttribLocation = (PFNGLGETATTRIBLOCATIONPROC)GetExtension("glGetAttribLocation");
-    glGenBuffers              = glGenBuffers = (PFNGLGENBUFFERSPROC)GetExtension("glGenBuffers");
-    glGenFramebuffers         = glGenFramebuffers = (PFNGLGENFRAMEBUFFERSPROC)GetExtension("glGenFramebuffers");
-    glGenVertexArrays         = glGenVertexArrays = (PFNGLGENVERTEXARRAYSPROC)GetExtension("glGenVertexArrays");
-    glGetUniformLocation      = glGetUniformLocation = (PFNGLGETUNIFORMLOCATIONPROC)GetExtension("glGetUniformLocation");
-    glLinkProgram             = glLinkProgram = (PFNGLLINKPROGRAMPROC)GetExtension("glLinkProgram");
-    glShaderSource            = glShaderSource = (PFNGLSHADERSOURCEPROC)GetExtension("glShaderSource");
-    glTexImage2DMultisample   = glTexImage2DMultisample = (PFNGLTEXIMAGE2DMULTISAMPLEPROC)GetExtension("glTexImage2DMultisample");
-    glVertexAttribPointer     = glVertexAttribPointer = (PFNGLVERTEXATTRIBPOINTERPROC)GetExtension("glVertexAttribPointer");
-    glUniformMatrix4fv        = glUniformMatrix4fv = (PFNGLUNIFORMMATRIX4FVPROC)GetExtension("glUniformMatrix4fv");
-    glUseProgram              = glUseProgram = (PFNGLUSEPROGRAMPROC)GetExtension("glUseProgram");
+    glAttachShader            = (PFNGLATTACHSHADERPROC)            GetExtension("glAttachShader"           );
+    glBlitFramebuffer         = (PFNGLBLITFRAMEBUFFERPROC)         GetExtension("glBlitFramebuffer"        );
+    glBindBuffer              = (PFNGLBINDBUFFERPROC)              GetExtension("glBindBuffer"             );
+    glBufferData              = (PFNGLBUFFERDATAPROC)              GetExtension("glBufferData"             );
+    glBindFramebuffer         = (PFNGLBINDFRAMEBUFFERPROC)         GetExtension("glBindFramebuffer"        );
+    glBindVertexArray         = (PFNGLBINDVERTEXARRAYPROC)         GetExtension("glBindVertexArray"        );
+    glCompileShader           = (PFNGLCOMPILESHADERPROC)           GetExtension("glCompileShader"          );
+    glCreateProgram           = (PFNGLCREATEPROGRAMPROC)           GetExtension("glCreateProgram"          );
+    glCreateShader            = (PFNGLCREATESHADERPROC)            GetExtension("glCreateShader"           );
+    glDeleteBuffers           = (PFNGLDELETEBUFFERSPROC)           GetExtension("glDeleteBuffers"          );
+    glDeleteFramebuffers      = (PFNGLDELETEFRAMEBUFFERSPROC)      GetExtension("glDeleteFramebuffers"     );
+    glDeleteProgram           = (PFNGLDELETEPROGRAMPROC)           GetExtension("glDeleteProgram"          );
+    glDeleteShader            = (PFNGLDELETESHADERPROC)            GetExtension("glDeleteShader"           );
+    glDeleteVertexArrays      = (PFNGLDELETEVERTEXARRAYSPROC)      GetExtension("glDeleteVertexArrays"     );
+    glEnableVertexAttribArray = (PFNGLENABLEVERTEXATTRIBARRAYPROC) GetExtension("glEnableVertexAttribArray");
+    glFramebufferTexture2D    = (PFNGLFRAMEBUFFERTEXTURE2DPROC)    GetExtension("glFramebufferTexture2D"   );
+    glGetAttribLocation       = (PFNGLGETATTRIBLOCATIONPROC)       GetExtension("glGetAttribLocation"      );
+    glGenBuffers              = (PFNGLGENBUFFERSPROC)              GetExtension("glGenBuffers"             );
+    glGenFramebuffers         = (PFNGLGENFRAMEBUFFERSPROC)         GetExtension("glGenFramebuffers"        );
+    glGenVertexArrays         = (PFNGLGENVERTEXARRAYSPROC)         GetExtension("glGenVertexArrays"        );
+    glGetUniformLocation      = (PFNGLGETUNIFORMLOCATIONPROC)      GetExtension("glGetUniformLocation"     );
+    glLinkProgram             = (PFNGLLINKPROGRAMPROC)             GetExtension("glLinkProgram"            );
+    glShaderSource            = (PFNGLSHADERSOURCEPROC)            GetExtension("glShaderSource"           );
+    glTexImage2DMultisample   = (PFNGLTEXIMAGE2DMULTISAMPLEPROC)   GetExtension("glTexImage2DMultisample"  );
+    glVertexAttribPointer     = (PFNGLVERTEXATTRIBPOINTERPROC)     GetExtension("glVertexAttribPointer"    );
+    glUniformMatrix4fv        = (PFNGLUNIFORMMATRIX4FVPROC)        GetExtension("glUniformMatrix4fv"       );
+    glUseProgram              = (PFNGLUSEPROGRAMPROC)              GetExtension("glUseProgram"             );
 }
 
 LRESULT APIENTRY WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
@@ -140,10 +125,9 @@ LRESULT APIENTRY WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
 
 ksGpuWindow window{};
 
-bool ksGpuDevice_Create(ksGpuDevice *device, ksDriverInstance *instance, const ksGpuQueueInfo *queueInfo) {
+bool ksGpuDevice_Create(ksGpuDevice *device, ksDriverInstance *instance) {
     memset(device, 0, sizeof(ksGpuDevice));
     device->instance = instance;
-    device->queueInfo = *queueInfo;
     return true;
 }
 
@@ -199,9 +183,7 @@ static bool ksGpuContext_CreateForSurface(ksGpuContext *context, HDC hDC) {
 }
 
 bool ksGpuWindow_Create(ksGpuWindow *window, int width, int height) {
-
     ksDriverInstance driverInstance{};
-    ksGpuQueueInfo queueInfo{};
 
     memset(window, 0, sizeof(ksGpuWindow));
 
@@ -277,7 +259,7 @@ bool ksGpuWindow_Create(ksGpuWindow *window, int width, int height) {
         return false;
     }
 
-    ksGpuDevice_Create(&window->device, &driverInstance, &queueInfo);
+    ksGpuDevice_Create(&window->device, &driverInstance);
 
     ksGpuContext_CreateForSurface(&window->context, window->hDC);
 
