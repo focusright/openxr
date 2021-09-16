@@ -8,6 +8,7 @@
 #define OPENGL_VERSION_MINOR 3
 #define GRAPHICS_API_OPENGL 1
 #define _USE_MATH_DEFINES
+#define APPLICATION_NAME "OpenXR OpenGL"
 
 #include <windows.h>
 #include <GL/gl.h>
@@ -26,39 +27,12 @@
 
 using namespace std;
 
-#define MAX_QUEUES 16
-#define BIT(x) (1 << (x))
-#define UNUSED_PARM(x) { (void)(x); }
-#define APPLICATION_NAME "OpenXR OpenGL"
-#define GL(func) func;
-
-typedef INT_PTR (WINAPI *PROC)();
-
-typedef struct {
-    int placeholder;
-} ksDriverInstance;
-
-typedef struct {
-    ksDriverInstance *instance;
-} ksGpuDevice;
-
-typedef struct {
-    HDC hDC;
-    HGLRC hGLRC;
-} ksGpuContext;
-
-typedef struct {
-    ksGpuDevice device;
-    ksGpuContext context;
-    int windowWidth;
-    int windowHeight;
-
-    HINSTANCE hInstance;
-    HDC hDC;
-    HWND hWnd;
-} ksGpuWindow;
-
-PROC GetExtension(const char *functionName) { return wglGetProcAddress(functionName); }
+HDC hDC;
+HGLRC hGLRC;
+HINSTANCE hInstance;
+HWND hWnd;
+int windowWidth;
+int windowHeight;
 
 PFNGLATTACHSHADERPROC             glAttachShader            ;
 PFNGLBLITFRAMEBUFFERPROC          glBlitFramebuffer         ;
@@ -88,6 +62,8 @@ PFNGLVERTEXATTRIBPOINTERPROC      glVertexAttribPointer     ;
 PFNGLUNIFORMMATRIX4FVPROC         glUniformMatrix4fv        ;
 PFNGLUSEPROGRAMPROC               glUseProgram              ;
 PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB;
+
+PROC GetExtension(const char *functionName) { return wglGetProcAddress(functionName); }
 
 void GlInitExtensions() {
     glAttachShader            = (PFNGLATTACHSHADERPROC)            GetExtension("glAttachShader"           );
@@ -123,101 +99,51 @@ LRESULT APIENTRY WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
     return DefWindowProcA(hWnd, message, wParam, lParam);
 }
 
-ksGpuWindow window{};
-
-bool ksGpuDevice_Create(ksGpuDevice *device, ksDriverInstance *instance) {
-    memset(device, 0, sizeof(ksGpuDevice));
-    device->instance = instance;
-    return true;
+void DestroyWindow() {
+    wglMakeCurrent(NULL, NULL);
+    wglDeleteContext(hGLRC);
+    ReleaseDC(hWnd, hDC);
+    DestroyWindow(hWnd);
+    UnregisterClassA(APPLICATION_NAME, hInstance);
 }
 
-void ksGpuContext_SetCurrent(ksGpuContext *context) { wglMakeCurrent(context->hDC, context->hGLRC); }
-
-void ksGpuDevice_Destroy(ksGpuDevice *device) { memset(device, 0, sizeof(ksGpuDevice)); }
-
-void ksGpuContext_Destroy(ksGpuContext *context) {
-    if (context->hGLRC) {
-        wglMakeCurrent(NULL, NULL);
-        wglDeleteContext(context->hGLRC);
-        context->hGLRC = NULL;
-    }
-}
-
-void ksGpuWindow_Destroy(ksGpuWindow *window) {
-    ksGpuContext_Destroy(&window->context);
-    ksGpuDevice_Destroy(&window->device);
-
-    if (window->hDC) {
-        ReleaseDC(window->hWnd, window->hDC);
-        window->hDC = NULL;
-    }
-
-    if (window->hWnd) {
-        DestroyWindow(window->hWnd);
-        window->hWnd = NULL;
-    }
-
-    if (window->hInstance) {
-        UnregisterClassA(APPLICATION_NAME, window->hInstance);
-        window->hInstance = NULL;
-    }
-}
-
-
-
-static bool ksGpuContext_CreateForSurface(ksGpuContext *context, HDC hDC) {
+void ksGpuContext_CreateForSurface() {
     PIXELFORMATDESCRIPTOR pfd = { sizeof(PIXELFORMATDESCRIPTOR), 1, PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,  PFD_TYPE_RGBA, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, PFD_MAIN_PLANE, 0, 0, 0, 0 };
     int pixelFormat = ChoosePixelFormat(hDC, &pfd);
     SetPixelFormat(hDC, pixelFormat, &pfd);
-    HGLRC hGLRC = wglCreateContext(hDC);
+    hGLRC = wglCreateContext(hDC);
     wglMakeCurrent(hDC, hGLRC);
     wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC)GetExtension("wglCreateContextAttribsARB");
     wglMakeCurrent(NULL, NULL);
     wglDeleteContext(hGLRC);
     int contextAttribs[] = {WGL_CONTEXT_MAJOR_VERSION_ARB, OPENGL_VERSION_MAJOR, WGL_CONTEXT_MINOR_VERSION_ARB, OPENGL_VERSION_MINOR, WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB, WGL_CONTEXT_FLAGS_ARB, WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB | WGL_CONTEXT_DEBUG_BIT_ARB, 0};
-    context->hDC = hDC;
-    context->hGLRC = wglCreateContextAttribsARB(hDC, NULL, contextAttribs);
-    wglMakeCurrent(hDC, context->hGLRC);
+    hGLRC = wglCreateContextAttribsARB(hDC, NULL, contextAttribs);
+    wglMakeCurrent(hDC, hGLRC);
     GlInitExtensions();
-    return true;
 }
 
-bool ksGpuWindow_Create(ksGpuWindow *window, int width, int height) {
-    ksDriverInstance driverInstance{};
-
-    memset(window, 0, sizeof(ksGpuWindow));
-
-    window->windowWidth = width;
-    window->windowHeight = height;
-
-    const LPCSTR displayDevice = NULL;
-
+void ksGpuWindow_Create(int width, int height) {
+    windowWidth = width;
+    windowHeight = height;
     DEVMODEA lpDevMode;
     memset(&lpDevMode, 0, sizeof(DEVMODEA));
     lpDevMode.dmSize = sizeof(DEVMODEA);
     lpDevMode.dmDriverExtra = 0;
-
-    window->hInstance = GetModuleHandleA(NULL);
-
+    hInstance = GetModuleHandleA(NULL);
     WNDCLASSA wc;
     wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
     wc.lpfnWndProc = (WNDPROC)WndProc;
     wc.cbClsExtra = 0;
     wc.cbWndExtra = 0;
-    wc.hInstance = window->hInstance;
+    wc.hInstance = hInstance;
     wc.hIcon = LoadIcon(NULL, IDI_WINLOGO);
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
     wc.hbrBackground = NULL;
     wc.lpszMenuName = NULL;
     wc.lpszClassName = APPLICATION_NAME;
-
     RegisterClassA(&wc);
-
-    DWORD dwExStyle = 0;
-    DWORD dwStyle = 0;
-
-    dwExStyle = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE;
-    dwStyle = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
+    DWORD dwExStyle = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE;
+    DWORD dwStyle = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
 
     RECT windowRect;
     windowRect.left = (long)0;
@@ -238,38 +164,24 @@ bool ksGpuWindow_Create(ksGpuWindow *window, int width, int height) {
     windowRect.top += offsetY;
     windowRect.bottom += offsetY;
 
-    window->hWnd = CreateWindowExA(dwExStyle,                         
-                                   APPLICATION_NAME, "", dwStyle|WS_CLIPSIBLINGS|WS_CLIPCHILDREN,
+    hWnd = CreateWindowExA(dwExStyle, APPLICATION_NAME, "", 
+                                   dwStyle | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
                                    windowRect.left, windowRect.top,
                                    windowRect.right - windowRect.left,
                                    windowRect.bottom - windowRect.top,
-                                   NULL, NULL, window->hInstance, NULL);
-    if (!window->hWnd) {
-        ksGpuWindow_Destroy(window);
-        printf("Failed to create window.");
-        return false;
-    }
+                                   NULL, NULL, hInstance, NULL);
 
-    SetWindowLongPtrA(window->hWnd, GWLP_USERDATA, (LONG_PTR)window);
+    //SetWindowLongPtrA(hWnd, GWLP_USERDATA, (LONG_PTR)window);
 
-    window->hDC = GetDC(window->hWnd);
-    if (!window->hDC) {
-        ksGpuWindow_Destroy(window);
-        printf("Failed to acquire device context.");
-        return false;
-    }
+    hDC = GetDC(hWnd);
 
-    ksGpuDevice_Create(&window->device, &driverInstance);
+    ksGpuContext_CreateForSurface();
 
-    ksGpuContext_CreateForSurface(&window->context, window->hDC);
+    wglMakeCurrent(hDC, hGLRC);
 
-    ksGpuContext_SetCurrent(&window->context);
-
-    ShowWindow(window->hWnd, SW_SHOW);
-    SetForegroundWindow(window->hWnd);
-    SetFocus(window->hWnd);
-
-    return true;
+    ShowWindow(hWnd, SW_SHOW);
+    SetForegroundWindow(hWnd);
+    SetFocus(hWnd);
 }
 
 
@@ -467,9 +379,7 @@ bool openxr_init() {
 
 void openxr_poll_events(bool &exit) {
 	exit = false;
-
 	XrEventDataBuffer event_buffer = { XR_TYPE_EVENT_DATA_BUFFER };
-
 	while (xrPollEvent(xr_instance, &event_buffer) == XR_SUCCESS) {
 		switch (event_buffer.type) {
 		case XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED: {
@@ -566,6 +476,7 @@ void openxr_shutdown() {
     xrDestroySession(xr_session);
     ext_xrDestroyDebugUtilsMessengerEXT(xr_debug);
     xrDestroyInstance(xr_instance);
+    DestroyWindow();
 }
 
 
@@ -575,10 +486,12 @@ void device_init() {
     xrGetInstanceProcAddr(xr_instance, "xrGetOpenGLGraphicsRequirementsKHR", reinterpret_cast<PFN_xrVoidFunction*>(&pfnGetOpenGLGraphicsRequirementsKHR));
     XrGraphicsRequirementsOpenGLKHR graphicsRequirements{XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_KHR};
     pfnGetOpenGLGraphicsRequirementsKHR(xr_instance, xr_system_id, &graphicsRequirements);
-    ksGpuWindow_Create(&window, 640, 480);
-    m_graphicsBinding.hDC = window.context.hDC;
-    m_graphicsBinding.hGLRC = window.context.hGLRC;
+    ksGpuWindow_Create(640, 480);
+    m_graphicsBinding.hDC = hDC;
+    m_graphicsBinding.hGLRC = hGLRC;
 }
+
+
 
 GLuint m_swapchainFramebuffer{0};
 GLuint m_program{0};
@@ -829,16 +742,16 @@ void opengl_render_layer(const XrCompositionLayerProjectionView& layerView, cons
         
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
         if (index == 0) {
-            glBlitFramebuffer(0, 0, width, height, 0, 0, window.windowWidth/2, window.windowHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+            glBlitFramebuffer(0, 0, width, height, 0, 0, windowWidth/2, windowHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST);
         } else if (index == 1) {
-            glBlitFramebuffer(0, 0, width, height, window.windowWidth/2, 0, window.windowWidth, window.windowHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+            glBlitFramebuffer(0, 0, width, height, windowWidth/2, 0, windowWidth, windowHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST);
         }
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         static int everyOther = 0;
         if ((everyOther++ & 1) != 0) {
-            SwapBuffers(window.context.hDC);
+            SwapBuffers(hDC);
         }
 }
 
