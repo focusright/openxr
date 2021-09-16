@@ -178,7 +178,6 @@ struct swapchain_t {
 };
 
 PFN_xrGetOpenGLGraphicsRequirementsKHR ext_xrGetOpenGLGraphicsRequirementsKHR = nullptr;
-XrFormFactor app_config_form = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
 XrViewConfigurationType app_config_view = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
 XrGraphicsBindingOpenGLWin32KHR xr_graphicsBinding{XR_TYPE_GRAPHICS_BINDING_OPENGL_WIN32_KHR};
 const XrPosef xr_pose_identity = { {0,0,0,1}, {0,0,0} };
@@ -189,8 +188,6 @@ bool xr_running = false;
 XrSpace xr_app_space = {};
 XrSystemId xr_system_id = XR_NULL_SYSTEM_ID;
 XrEnvironmentBlendMode xr_blend = {};
-XrDebugUtilsMessengerEXT xr_debug = {};
-XrSpaceLocation xr_fixed_space = {};
 vector<XrView> xr_views;
 vector<XrViewConfigurationView> xr_config_views;
 vector<swapchain_t> xr_swapchains;
