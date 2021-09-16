@@ -180,7 +180,7 @@ struct swapchain_t {
 PFN_xrGetOpenGLGraphicsRequirementsKHR ext_xrGetOpenGLGraphicsRequirementsKHR = nullptr;
 XrFormFactor app_config_form = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
 XrViewConfigurationType app_config_view = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
-XrGraphicsBindingOpenGLWin32KHR m_graphicsBinding{XR_TYPE_GRAPHICS_BINDING_OPENGL_WIN32_KHR};
+XrGraphicsBindingOpenGLWin32KHR xr_graphicsBinding{XR_TYPE_GRAPHICS_BINDING_OPENGL_WIN32_KHR};
 const XrPosef xr_pose_identity = { {0,0,0,1}, {0,0,0} };
 XrInstance xr_instance = {};
 XrSession xr_session = {};
@@ -238,7 +238,7 @@ bool openxr_init() {
     device_init();
 
 	XrSessionCreateInfo sessionInfo = { XR_TYPE_SESSION_CREATE_INFO };
-	sessionInfo.next     = &m_graphicsBinding;
+	sessionInfo.next = &xr_graphicsBinding;
 	sessionInfo.systemId = xr_system_id;
 	xrCreateSession(xr_instance, &sessionInfo, &xr_session);
 
@@ -398,8 +398,8 @@ void device_init() {
     XrGraphicsRequirementsOpenGLKHR graphicsRequirements{XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_KHR};
     pfnGetOpenGLGraphicsRequirementsKHR(xr_instance, xr_system_id, &graphicsRequirements);
     create_app_window();
-    m_graphicsBinding.hDC = hDC;
-    m_graphicsBinding.hGLRC = hGLRC;
+    xr_graphicsBinding.hDC = hDC;
+    xr_graphicsBinding.hGLRC = hGLRC;
 }
 
 
