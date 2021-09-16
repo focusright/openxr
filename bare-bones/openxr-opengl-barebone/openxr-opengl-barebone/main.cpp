@@ -1124,7 +1124,7 @@ XrReferenceSpaceCreateInfo GetXrReferenceSpaceCreateInfo(const std::string& refe
     return referenceSpaceCreateInfo;
 }
 
-bool openxr_init(const char *app_name, int64_t swapchain_format) {
+bool openxr_init() {
 	vector<const char*> use_extensions;
 	const char         *ask_extensions[] = { 
 		XR_KHR_OPENGL_ENABLE_EXTENSION_NAME,
@@ -1158,7 +1158,7 @@ bool openxr_init(const char *app_name, int64_t swapchain_format) {
 	createInfo.enabledExtensionCount      = use_extensions.size();
 	createInfo.enabledExtensionNames      = use_extensions.data();
 	createInfo.applicationInfo.apiVersion = XR_CURRENT_API_VERSION;
-	strcpy_s(createInfo.applicationInfo.applicationName, app_name);
+	strcpy_s(createInfo.applicationInfo.applicationName, "bare bone");
 	xrCreateInstance(&createInfo, &xr_instance);
 
 	if (xr_instance == nullptr)
@@ -1211,7 +1211,6 @@ bool openxr_init(const char *app_name, int64_t swapchain_format) {
 	if (xr_session == nullptr)
 		return false;
 
-    //std::string visualizedSpaces[] = {"ViewFront", "Local", "Stage", "StageLeft", "StageRight", "StageLeftRotated", "StageRightRotated"};
     std::string visualizedSpaces[] = {"Custom"};
     for (const auto& visualizedSpace : visualizedSpaces) {
         XrReferenceSpaceCreateInfo referenceSpaceCreateInfo = GetXrReferenceSpaceCreateInfo(visualizedSpace);
@@ -1241,7 +1240,7 @@ bool openxr_init(const char *app_name, int64_t swapchain_format) {
 		swapchain_info.arraySize   = 1;
 		swapchain_info.mipCount    = 1;
 		swapchain_info.faceCount   = 1;
-		swapchain_info.format      = swapchain_format;
+		swapchain_info.format      = GL_RGBA8;
 		swapchain_info.width       = view.recommendedImageRectWidth;
 		swapchain_info.height      = view.recommendedImageRectHeight;
 		swapchain_info.sampleCount = view.recommendedSwapchainSampleCount;
@@ -1261,60 +1260,6 @@ bool openxr_init(const char *app_name, int64_t swapchain_format) {
 	}
 
 	return true;
-}
-
-void openxr_make_actions() {
-	XrActionSetCreateInfo actionset_info = { XR_TYPE_ACTION_SET_CREATE_INFO };
-	strcpy_s(actionset_info.actionSetName,          "gameplay");
-	strcpy_s(actionset_info.localizedActionSetName, "Gameplay");
-	xrCreateActionSet(xr_instance, &actionset_info, &xr_input.actionSet);
-	xrStringToPath(xr_instance, "/user/hand/left",  &xr_input.handSubactionPath[0]);
-	xrStringToPath(xr_instance, "/user/hand/right", &xr_input.handSubactionPath[1]);
-
-	XrActionCreateInfo action_info = { XR_TYPE_ACTION_CREATE_INFO };
-	action_info.countSubactionPaths = _countof(xr_input.handSubactionPath);
-	action_info.subactionPaths      = xr_input.handSubactionPath;
-	action_info.actionType          = XR_ACTION_TYPE_POSE_INPUT;
-	strcpy_s(action_info.actionName,          "hand_pose");
-	strcpy_s(action_info.localizedActionName, "Hand Pose");
-	xrCreateAction(xr_input.actionSet, &action_info, &xr_input.poseAction);
-
-	action_info.actionType = XR_ACTION_TYPE_BOOLEAN_INPUT;
-	strcpy_s(action_info.actionName,          "select");
-	strcpy_s(action_info.localizedActionName, "Select");
-	xrCreateAction(xr_input.actionSet, &action_info, &xr_input.selectAction);
-
-	XrPath profile_path;
-	XrPath pose_path  [2];
-	XrPath select_path[2];
-	xrStringToPath(xr_instance, "/user/hand/left/input/grip/pose",     &pose_path[0]);
-	xrStringToPath(xr_instance, "/user/hand/right/input/grip/pose",    &pose_path[1]);
-	xrStringToPath(xr_instance, "/user/hand/left/input/select/click",  &select_path[0]);
-	xrStringToPath(xr_instance, "/user/hand/right/input/select/click", &select_path[1]);
-	xrStringToPath(xr_instance, "/interaction_profiles/khr/simple_controller", &profile_path);
-	XrActionSuggestedBinding bindings[] = {
-		{ xr_input.poseAction,   pose_path[0]   },
-		{ xr_input.poseAction,   pose_path[1]   },
-		{ xr_input.selectAction, select_path[0] },
-		{ xr_input.selectAction, select_path[1] }, };
-	XrInteractionProfileSuggestedBinding suggested_binds = { XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING };
-	suggested_binds.interactionProfile     = profile_path;
-	suggested_binds.suggestedBindings      = &bindings[0];
-	suggested_binds.countSuggestedBindings = _countof(bindings);
-	xrSuggestInteractionProfileBindings(xr_instance, &suggested_binds);
-
-	for (int32_t i = 0; i < 2; i++) {
-		XrActionSpaceCreateInfo action_space_info = { XR_TYPE_ACTION_SPACE_CREATE_INFO };
-		action_space_info.action            = xr_input.poseAction;
-		action_space_info.poseInActionSpace = xr_pose_identity;
-		action_space_info.subactionPath     = xr_input.handSubactionPath[i];
-		xrCreateActionSpace(xr_session, &action_space_info, &xr_input.handSpace[i]);
-	}
-
-	XrSessionActionSetsAttachInfo attach_info = { XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO };
-	attach_info.countActionSets = 1;
-	attach_info.actionSets      = &xr_input.actionSet;
-	xrAttachSessionActionSets(xr_session, &attach_info);
 }
 
 void openxr_poll_events(bool &exit) {
@@ -1339,56 +1284,13 @@ void openxr_poll_events(bool &exit) {
 				    xr_running = false;
 				    xrEndSession(xr_session); 
 			    } break;
-			    case XR_SESSION_STATE_EXITING:      exit = true;              break;
-			    case XR_SESSION_STATE_LOSS_PENDING: exit = true;              break;
+			    case XR_SESSION_STATE_EXITING:      exit = true; break;
+			    case XR_SESSION_STATE_LOSS_PENDING: exit = true; break;
 			}
 		} break;
 		case XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING: exit = true; return;
 		}
 		event_buffer = { XR_TYPE_EVENT_DATA_BUFFER };
-	}
-}
-
-void openxr_poll_actions() {
-	if (xr_session_state != XR_SESSION_STATE_FOCUSED)
-		return;
-
-    xr_input.handActive = {XR_FALSE, XR_FALSE};
-
-	XrActiveActionSet action_set = { };
-	action_set.actionSet     = xr_input.actionSet;
-	action_set.subactionPath = XR_NULL_PATH;
-
-	XrActionsSyncInfo sync_info = { XR_TYPE_ACTIONS_SYNC_INFO };
-	sync_info.countActiveActionSets = 1;
-	sync_info.activeActionSets      = &action_set;
-
-	xrSyncActions(xr_session, &sync_info);
-
-	for (uint32_t hand = 0; hand < 2; hand++) {
-		XrActionStateGetInfo get_info = { XR_TYPE_ACTION_STATE_GET_INFO };
-		get_info.subactionPath = xr_input.handSubactionPath[hand];
-
-		XrActionStatePose pose_state = { XR_TYPE_ACTION_STATE_POSE };
-		get_info.action = xr_input.poseAction;
-		xrGetActionStatePose(xr_session, &get_info, &pose_state);
-		xr_input.renderHand[hand] = pose_state.isActive;
-        xr_input.handActive[hand] = pose_state.isActive;
-
-		XrActionStateBoolean select_state = { XR_TYPE_ACTION_STATE_BOOLEAN };
-		get_info.action = xr_input.selectAction;
-		xrGetActionStateBoolean(xr_session, &get_info, &select_state);
-		xr_input.handSelect[hand] = select_state.currentState && select_state.changedSinceLastSync;
-
-		if (xr_input.handSelect[hand]) {
-			XrSpaceLocation space_location = { XR_TYPE_SPACE_LOCATION };
-			XrResult res = xrLocateSpace(xr_input.handSpace[hand], xr_app_space, select_state.lastChangeTime, &space_location);
-			if (XR_UNQUALIFIED_SUCCESS(res) &&
-				(space_location.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT   ) != 0 &&
-				(space_location.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) != 0) {
-				xr_input.handPose[hand] = space_location.pose;
-			}
-		}
 	}
 }
 
@@ -1721,9 +1623,6 @@ void opengl_init() {
         glBindBuffer(GL_ARRAY_BUFFER, m_cubeVertexBuffer);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_cubeIndexBuffer);
 
-        //glEnableVertexAttribArray(m_vertexAttribCoords);
-        //glEnableVertexAttribArray(m_vertexAttribColor);
-
         glGenBuffers(1, &m_sphereVertexBuffer);
         glBindBuffer(GL_ARRAY_BUFFER, m_sphereVertexBuffer);
         glBufferData(GL_ARRAY_BUFFER, sizeof(Geometry::c_sphereVertices), Geometry::c_sphereVertices, GL_STATIC_DRAW);
@@ -1889,59 +1788,15 @@ void opengl_shutdown() {
     }
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 int main(int argc, char* argv[]) {
-	if (!openxr_init("Single file OpenXR", gl_swapchain_fmt)) {
-		opengl_shutdown();
-		MessageBox(nullptr, "OpenXR initialization failed\n", "Error", 1);
-		return 1;
-	}
-
-    static bool quit = false;
-    auto exitPollingThread = std::thread{[] {
-        printf("Press Enter key to shutdown...");
-        (void)getchar();
-        quit = true;
-    }}; exitPollingThread.detach();
-
-	openxr_make_actions();
+    openxr_init();
 	opengl_init();
 
+    static bool quit = false;
 	while (!quit) {
 		openxr_poll_events(quit);
-
 		if (xr_running) {
-			openxr_poll_actions();
 			openxr_render_frame();
-
-			if (xr_session_state != XR_SESSION_STATE_VISIBLE && 
-				xr_session_state != XR_SESSION_STATE_FOCUSED) {
-				this_thread::sleep_for(chrono::milliseconds(250));
-			}
 		}
 	}
 
