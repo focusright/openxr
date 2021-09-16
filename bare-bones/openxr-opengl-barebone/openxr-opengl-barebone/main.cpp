@@ -6,9 +6,6 @@
 #define XR_USE_GRAPHICS_API_OPENGL
 #define OPENGL_VERSION_MAJOR 4
 #define OPENGL_VERSION_MINOR 3
-#define GLSL_VERSION "430"
-#define SPIRV_VERSION "99"
-#define USE_SYNC_OBJECT 0  // 0 = GLsync, 1 = EGLSyncKHR, 2 = storage buffer
 #define GRAPHICS_API_OPENGL 1
 #define _USE_MATH_DEFINES
 
@@ -20,7 +17,6 @@
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
 #include <common/xr_linear.h>
-#include <thread>
 #include <vector>
 #include <string>
 #include <algorithm>
@@ -29,9 +25,6 @@
 #include <cmath>
 
 using namespace std;
-
-#define OPENGL_VERSION_MAJOR 4
-#define OPENGL_VERSION_MINOR 3
 
 #define MAX_QUEUES 16
 #define BIT(x) (1 << (x))
@@ -184,9 +177,7 @@ PFNGLRENDERBUFFERSTORAGEMULTISAMPLEEXTPROC glRenderbufferStorageMultisampleEXT;
 PFNGLFRAMEBUFFERRENDERBUFFERPROC glFramebufferRenderbuffer;
 PFNGLFRAMEBUFFERTEXTURE2DPROC glFramebufferTexture2D;
 PFNGLFRAMEBUFFERTEXTURELAYERPROC glFramebufferTextureLayer;
-//PFNGLFRAMEBUFFERTEXTURE2DMULTISAMPLEEXTPROC glFramebufferTexture2DMultisampleEXT;
 PFNGLFRAMEBUFFERTEXTUREMULTIVIEWOVRPROC glFramebufferTextureMultiviewOVR;
-//PFNGLFRAMEBUFFERTEXTUREMULTISAMPLEMULTIVIEWOVRPROC glFramebufferTextureMultisampleMultiviewOVR;
 PFNGLCHECKFRAMEBUFFERSTATUSPROC glCheckFramebufferStatus;
 PFNGLCHECKNAMEDFRAMEBUFFERSTATUSPROC glCheckNamedFramebufferStatus;
 PFNGLGENBUFFERSPROC glGenBuffers;
@@ -306,9 +297,7 @@ void GlInitExtensions() {
     glFramebufferRenderbuffer = (PFNGLFRAMEBUFFERRENDERBUFFERPROC)GetExtension("glFramebufferRenderbuffer");
     glFramebufferTexture2D = (PFNGLFRAMEBUFFERTEXTURE2DPROC)GetExtension("glFramebufferTexture2D");
     glFramebufferTextureLayer = (PFNGLFRAMEBUFFERTEXTURELAYERPROC)GetExtension("glFramebufferTextureLayer");
-    //glFramebufferTexture2DMultisampleEXT = (PFNGLFRAMEBUFFERTEXTURE2DMULTISAMPLEEXTPROC)GetExtension("glFramebufferTexture2DMultisampleEXT");
     glFramebufferTextureMultiviewOVR = (PFNGLFRAMEBUFFERTEXTUREMULTIVIEWOVRPROC)GetExtension("glFramebufferTextureMultiviewOVR");
-    //glFramebufferTextureMultisampleMultiviewOVR = (PFNGLFRAMEBUFFERTEXTUREMULTISAMPLEMULTIVIEWOVRPROC)GetExtension("glFramebufferTextureMultisampleMultiviewOVR");
     glCheckFramebufferStatus = (PFNGLCHECKFRAMEBUFFERSTATUSPROC)GetExtension("glCheckFramebufferStatus");
     glCheckNamedFramebufferStatus = (PFNGLCHECKNAMEDFRAMEBUFFERSTATUSPROC)GetExtension("glCheckNamedFramebufferStatus");
 
@@ -456,40 +445,14 @@ static void Error(const char *format, ...) {
     OutputDebugStringA(buffer);
 }
 
-ksGpuSurfaceBits ksGpuContext_BitsForSurfaceFormat(const ksGpuSurfaceColorFormat colorFormat,
-                                                   const ksGpuSurfaceDepthFormat depthFormat) {
+ksGpuSurfaceBits ksGpuContext_BitsForSurfaceFormat(const ksGpuSurfaceColorFormat colorFormat, const ksGpuSurfaceDepthFormat depthFormat) {
     ksGpuSurfaceBits bits;
-    bits.redBits = ((colorFormat == KS_GPU_SURFACE_COLOR_FORMAT_R8G8B8A8)
-                        ? 8
-                        : ((colorFormat == KS_GPU_SURFACE_COLOR_FORMAT_B8G8R8A8)
-                               ? 8
-                               : ((colorFormat == KS_GPU_SURFACE_COLOR_FORMAT_R5G6B5)
-                                      ? 5
-                                      : ((colorFormat == KS_GPU_SURFACE_COLOR_FORMAT_B5G6R5) ? 5 : 8))));
-    bits.greenBits = ((colorFormat == KS_GPU_SURFACE_COLOR_FORMAT_R8G8B8A8)
-                          ? 8
-                          : ((colorFormat == KS_GPU_SURFACE_COLOR_FORMAT_B8G8R8A8)
-                                 ? 8
-                                 : ((colorFormat == KS_GPU_SURFACE_COLOR_FORMAT_R5G6B5)
-                                        ? 6
-                                        : ((colorFormat == KS_GPU_SURFACE_COLOR_FORMAT_B5G6R5) ? 6 : 8))));
-    bits.blueBits = ((colorFormat == KS_GPU_SURFACE_COLOR_FORMAT_R8G8B8A8)
-                         ? 8
-                         : ((colorFormat == KS_GPU_SURFACE_COLOR_FORMAT_B8G8R8A8)
-                                ? 8
-                                : ((colorFormat == KS_GPU_SURFACE_COLOR_FORMAT_R5G6B5)
-                                       ? 5
-                                       : ((colorFormat == KS_GPU_SURFACE_COLOR_FORMAT_B5G6R5) ? 5 : 8))));
-    bits.alphaBits = ((colorFormat == KS_GPU_SURFACE_COLOR_FORMAT_R8G8B8A8)
-                          ? 8
-                          : ((colorFormat == KS_GPU_SURFACE_COLOR_FORMAT_B8G8R8A8)
-                                 ? 8
-                                 : ((colorFormat == KS_GPU_SURFACE_COLOR_FORMAT_R5G6B5)
-                                        ? 0
-                                        : ((colorFormat == KS_GPU_SURFACE_COLOR_FORMAT_B5G6R5) ? 0 : 8))));
+    bits.redBits = 8;
+    bits.greenBits = 8;
+    bits.blueBits = 8;
+    bits.alphaBits = 8;
     bits.colorBits = bits.redBits + bits.greenBits + bits.blueBits + bits.alphaBits;
-    bits.depthBits =
-        ((depthFormat == KS_GPU_SURFACE_DEPTH_FORMAT_D16) ? 16 : ((depthFormat == KS_GPU_SURFACE_DEPTH_FORMAT_D24) ? 24 : 0));
+    bits.depthBits = 24;
     return bits;
 }
 
@@ -505,96 +468,7 @@ void GlBootstrapExtensions() {
 
 
 
-typedef enum {
-    KEY_A = 0x41,
-    KEY_B = 0x42,
-    KEY_C = 0x43,
-    KEY_D = 0x44,
-    KEY_E = 0x45,
-    KEY_F = 0x46,
-    KEY_G = 0x47,
-    KEY_H = 0x48,
-    KEY_I = 0x49,
-    KEY_J = 0x4A,
-    KEY_K = 0x4B,
-    KEY_L = 0x4C,
-    KEY_M = 0x4D,
-    KEY_N = 0x4E,
-    KEY_O = 0x4F,
-    KEY_P = 0x50,
-    KEY_Q = 0x51,
-    KEY_R = 0x52,
-    KEY_S = 0x53,
-    KEY_T = 0x54,
-    KEY_U = 0x55,
-    KEY_V = 0x56,
-    KEY_W = 0x57,
-    KEY_X = 0x58,
-    KEY_Y = 0x59,
-    KEY_Z = 0x5A,
-    KEY_RETURN = VK_RETURN,
-    KEY_TAB = VK_TAB,
-    KEY_ESCAPE = VK_ESCAPE,
-    KEY_SHIFT_LEFT = VK_LSHIFT,
-    KEY_CTRL_LEFT = VK_LCONTROL,
-    KEY_ALT_LEFT = VK_LMENU,
-    KEY_CURSOR_UP = VK_UP,
-    KEY_CURSOR_DOWN = VK_DOWN,
-    KEY_CURSOR_LEFT = VK_LEFT,
-    KEY_CURSOR_RIGHT = VK_RIGHT
-} ksKeyboardKey;
-
-typedef enum { MOUSE_LEFT = 0, MOUSE_RIGHT = 1 } ksMouseButton;
-
 LRESULT APIENTRY WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
-    ksGpuWindow *window = (ksGpuWindow *)GetWindowLongPtrA(hWnd, GWLP_USERDATA);
-
-    switch (message) {
-        case WM_SIZE: {
-            if (window != NULL) {
-                window->windowWidth = (int)LOWORD(lParam);
-                window->windowHeight = (int)HIWORD(lParam);
-            }
-            return 0;
-        }
-        case WM_ACTIVATE: {
-            if (window != NULL) {
-                window->windowActiveState = !HIWORD(wParam);
-            }
-            return 0;
-        }
-        case WM_ERASEBKGND: {
-            return 0;
-        }
-        case WM_CLOSE: {
-            PostQuitMessage(0);
-            return 0;
-        }
-        case WM_KEYDOWN: {
-            if (window != NULL) {
-                if ((int)wParam >= 0 && (int)wParam < 256) {
-                    if ((int)wParam != KEY_SHIFT_LEFT && (int)wParam != KEY_CTRL_LEFT && (int)wParam != KEY_ALT_LEFT &&
-                        (int)wParam != KEY_CURSOR_UP && (int)wParam != KEY_CURSOR_DOWN && (int)wParam != KEY_CURSOR_LEFT &&
-                        (int)wParam != KEY_CURSOR_RIGHT) {
-                        window->input.keyInput[(int)wParam] = true;
-                    }
-                }
-            }
-            break;
-        }
-        case WM_LBUTTONDOWN: {
-            window->input.mouseInput[MOUSE_LEFT] = true;
-            window->input.mouseInputX[MOUSE_LEFT] = LOWORD(lParam);
-            window->input.mouseInputY[MOUSE_LEFT] = window->windowHeight - HIWORD(lParam);
-            break;
-        }
-        case WM_RBUTTONDOWN: {
-            window->input.mouseInput[MOUSE_RIGHT] = true;
-            window->input.mouseInputX[MOUSE_RIGHT] = LOWORD(lParam);
-            window->input.mouseInputY[MOUSE_RIGHT] = window->windowHeight - HIWORD(lParam);
-            break;
-        }
-    }
     return DefWindowProcA(hWnd, message, wParam, lParam);
 }
 
@@ -925,16 +799,6 @@ bool ksGpuWindow_Create(ksGpuWindow *window, ksDriverInstance *instance, const k
     return true;
 }
 
-void ksGpuWindow_SwapBuffers(ksGpuWindow *window) {
-    SwapBuffers(window->context.hDC);
-    ksNanoseconds newTimeNanoseconds = GetTimeNanoseconds();
-    const float frameTimeNanoseconds = 1000.0f * 1000.0f * 1000.0f / window->windowRefreshRate;
-    const float deltaTimeNanoseconds = (float)newTimeNanoseconds - window->lastSwapTime - frameTimeNanoseconds;
-    if (fabsf(deltaTimeNanoseconds) < frameTimeNanoseconds * 0.75f) {
-        newTimeNanoseconds = (ksNanoseconds)(window->lastSwapTime + frameTimeNanoseconds + 0.025f * deltaTimeNanoseconds);
-    }
-    window->lastSwapTime = newTimeNanoseconds;
-}
 
 
 
@@ -997,10 +861,6 @@ void ksGpuWindow_SwapBuffers(ksGpuWindow *window) {
 
 
 
-struct Cube {
-    XrPosef Pose;
-    XrVector3f Scale;
-};
 
 void device_init(); //function protocols for openxr_init() to see
 void opengl_render_layer(const XrCompositionLayerProjectionView& layerView, const XrSwapchainImageOpenGLKHR* swapchainImage, int index);
@@ -1049,7 +909,6 @@ vector<swapchain_t>             xr_swapchains;
 
 int64_t gl_swapchain_fmt = GL_RGBA8;
 XrGraphicsBindingOpenGLWin32KHR m_graphicsBinding{XR_TYPE_GRAPHICS_BINDING_OPENGL_WIN32_KHR};
-std::vector<XrSpace> m_visualizedSpaces;
 
 namespace Side {
     const int LEFT = 0;
@@ -1087,39 +946,6 @@ inline bool EqualsIgnoreCase(const std::string& s1, const std::string& s2, const
     const std::ctype<char>& ctype = std::use_facet<std::ctype<char>>(loc);
     const auto compareCharLower = [&](char c1, char c2) { return ctype.tolower(c1) == ctype.tolower(c2); };
     return s1.size() == s2.size() && std::equal(s1.begin(), s1.end(), s2.begin(), compareCharLower);
-}
-
-XrReferenceSpaceCreateInfo GetXrReferenceSpaceCreateInfo(const std::string& referenceSpaceTypeStr) {
-    XrReferenceSpaceCreateInfo referenceSpaceCreateInfo{XR_TYPE_REFERENCE_SPACE_CREATE_INFO};
-    referenceSpaceCreateInfo.poseInReferenceSpace = Math::Pose::Identity();
-    if (EqualsIgnoreCase(referenceSpaceTypeStr, "View")) {
-        referenceSpaceCreateInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_VIEW;
-    } else if (EqualsIgnoreCase(referenceSpaceTypeStr, "ViewFront")) { // Render head-locked 2m in front of device.
-        referenceSpaceCreateInfo.poseInReferenceSpace = Math::Pose::Translation({0.f, 0.f, -2.f}),
-        referenceSpaceCreateInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_VIEW;
-    } else if (EqualsIgnoreCase(referenceSpaceTypeStr, "Local")) {
-        referenceSpaceCreateInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_LOCAL;
-    } else if (EqualsIgnoreCase(referenceSpaceTypeStr, "Stage")) {
-        referenceSpaceCreateInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
-    } else if (EqualsIgnoreCase(referenceSpaceTypeStr, "StageLeft")) {
-        referenceSpaceCreateInfo.poseInReferenceSpace = Math::Pose::RotateCCWAboutYAxis(0.f, {-2.f, 0.f, -2.f});
-        referenceSpaceCreateInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
-    } else if (EqualsIgnoreCase(referenceSpaceTypeStr, "StageRight")) {
-        referenceSpaceCreateInfo.poseInReferenceSpace = Math::Pose::RotateCCWAboutYAxis(0.f, {2.f, 0.f, -2.f});
-        referenceSpaceCreateInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
-    } else if (EqualsIgnoreCase(referenceSpaceTypeStr, "StageLeftRotated")) {
-        referenceSpaceCreateInfo.poseInReferenceSpace = Math::Pose::RotateCCWAboutYAxis(3.14f / 3.f, {-2.f, 0.5f, -2.f});
-        referenceSpaceCreateInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
-    } else if (EqualsIgnoreCase(referenceSpaceTypeStr, "StageRightRotated")) {
-        referenceSpaceCreateInfo.poseInReferenceSpace = Math::Pose::RotateCCWAboutYAxis(-3.14f / 3.f, {2.f, 0.5f, -2.f});
-        referenceSpaceCreateInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
-    } else if (EqualsIgnoreCase(referenceSpaceTypeStr, "Custom")) {
-        referenceSpaceCreateInfo.poseInReferenceSpace = Math::Pose::RotateCCWAboutYAxis(0.f, {-.3f, 1.5f, -1.f});
-        referenceSpaceCreateInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
-    } else {
-        throw std::logic_error("Unknown reference space type " + referenceSpaceTypeStr);
-    }
-    return referenceSpaceCreateInfo;
 }
 
 bool openxr_init() {
@@ -1209,17 +1035,13 @@ bool openxr_init() {
 	if (xr_session == nullptr)
 		return false;
 
-    std::string visualizedSpaces[] = {"Custom"};
-    for (const auto& visualizedSpace : visualizedSpaces) {
-        XrReferenceSpaceCreateInfo referenceSpaceCreateInfo = GetXrReferenceSpaceCreateInfo(visualizedSpace);
-        XrSpace space;
-        XrResult res = xrCreateReferenceSpace(xr_session, &referenceSpaceCreateInfo, &space);
-        if (XR_SUCCEEDED(res)) {
-            m_visualizedSpaces.push_back(space);
-        } else {
-            printf("Failed to create reference space %s with error %d", visualizedSpace.c_str(), res);
-        }
-    }
+    XrReferenceSpaceCreateInfo referenceSpaceCreateInfo{XR_TYPE_REFERENCE_SPACE_CREATE_INFO};
+    referenceSpaceCreateInfo.poseInReferenceSpace = Math::Pose::Identity();
+    referenceSpaceCreateInfo.poseInReferenceSpace = Math::Pose::RotateCCWAboutYAxis(0.f, {-.3f, 1.5f, -1.f});
+    referenceSpaceCreateInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
+    XrSpace space;
+    XrResult res = xrCreateReferenceSpace(xr_session, &referenceSpaceCreateInfo, &space);
+
 	XrReferenceSpaceCreateInfo ref_space = { XR_TYPE_REFERENCE_SPACE_CREATE_INFO };
 	ref_space.poseInReferenceSpace = xr_pose_identity;
 	ref_space.referenceSpaceType   = XR_REFERENCE_SPACE_TYPE_LOCAL;
@@ -1357,21 +1179,10 @@ void openxr_shutdown() {
 		xrDestroySwapchain(xr_swapchains[i].handle);
 	}
 	xr_swapchains.clear();
-    
-    for (XrSpace visualizedSpace : m_visualizedSpaces) {
-        xrDestroySpace(visualizedSpace);
-    }
-
-	if (xr_input.actionSet != XR_NULL_HANDLE) {
-		if (xr_input.handSpace[0] != XR_NULL_HANDLE) xrDestroySpace(xr_input.handSpace[0]);
-		if (xr_input.handSpace[1] != XR_NULL_HANDLE) xrDestroySpace(xr_input.handSpace[1]);
-		xrDestroyActionSet(xr_input.actionSet);
-	}
-    
-	if (xr_app_space != XR_NULL_HANDLE) xrDestroySpace   (xr_app_space);
-	if (xr_session   != XR_NULL_HANDLE) xrDestroySession (xr_session);
-	if (xr_debug     != XR_NULL_HANDLE) ext_xrDestroyDebugUtilsMessengerEXT(xr_debug);
-	if (xr_instance  != XR_NULL_HANDLE) xrDestroyInstance(xr_instance);
+    xrDestroySpace(xr_app_space);
+    xrDestroySession(xr_session);
+    ext_xrDestroyDebugUtilsMessengerEXT(xr_debug);
+    xrDestroyInstance(xr_instance);
 }
 
 
@@ -1704,7 +1515,7 @@ void opengl_render_layer(const XrCompositionLayerProjectionView& layerView, cons
 
         static int everyOther = 0;
         if ((everyOther++ & 1) != 0) {
-            ksGpuWindow_SwapBuffers(&window);
+            SwapBuffers(window.context.hDC);
         }
 }
 
