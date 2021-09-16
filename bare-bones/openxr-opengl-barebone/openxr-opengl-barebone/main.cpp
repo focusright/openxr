@@ -59,13 +59,6 @@ typedef struct {
 } ksDriverInstance;
 
 typedef struct {
-    bool keyInput[256];
-    bool mouseInput[8];
-    int mouseInputX[8];
-    int mouseInputY[8];
-} ksGpuWindowInput;
-
-typedef struct {
     int queueCount;                                  // number of queues
     ksGpuQueueProperty queueProperties;              // desired queue family properties
     ksGpuQueuePriority queuePriorities[MAX_QUEUES];  // individual queue priorities
@@ -93,7 +86,6 @@ typedef struct {
     bool windowFullscreen;
     bool windowActive;
     bool windowExit;
-    ksGpuWindowInput input;
 
     HINSTANCE hInstance;
     HDC hDC;
@@ -1026,14 +1018,9 @@ ksGpuWindow window{};
 void device_init() {
         PFN_xrGetOpenGLGraphicsRequirementsKHR pfnGetOpenGLGraphicsRequirementsKHR = nullptr;
         xrGetInstanceProcAddr(xr_instance, "xrGetOpenGLGraphicsRequirementsKHR", reinterpret_cast<PFN_xrVoidFunction*>(&pfnGetOpenGLGraphicsRequirementsKHR));
-
         XrGraphicsRequirementsOpenGLKHR graphicsRequirements{XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_KHR};
         pfnGetOpenGLGraphicsRequirementsKHR(xr_instance, xr_system_id, &graphicsRequirements);
-
-        if (!ksGpuWindow_Create(&window, 640, 480, false)) {
-            throw std::logic_error("Unable to create GL context");
-        }
-
+        ksGpuWindow_Create(&window, 640, 480, false);
         m_graphicsBinding.hDC = window.context.hDC;
         m_graphicsBinding.hGLRC = window.context.hGLRC;
 }
@@ -1057,25 +1044,8 @@ GLuint m_sphereIndexBuffer{0};
 std::map<uint32_t, uint32_t> m_colorToDepthMap;
 
 constexpr float DarkSlateGray[] = {0.184313729f, 0.309803933f, 0.309803933f, 1.0f};
-static const char* VertexShaderGlsl = R"_(
-    #version 410
-    in vec3 VertexPos;
-    in vec3 VertexColor;
-    out vec3 PSVertexColor;
-    uniform mat4 ModelViewProjection;
-    void main() {
-       gl_Position = ModelViewProjection * vec4(VertexPos, 1.0);
-       PSVertexColor = VertexColor;
-    }
-    )_";
-static const char* FragmentShaderGlsl = R"_(
-    #version 410
-    in vec3 PSVertexColor;
-    out vec4 FragColor;
-    void main() {
-       FragColor = vec4(PSVertexColor, 1);
-    }
-    )_";
+static const char* VertexShaderGlsl = "#version 410\n\nin vec3 VertexPos;in vec3 VertexColor;out vec3 PSVertexColor;uniform mat4 ModelViewProjection;void main() {gl_Position = ModelViewProjection * vec4(VertexPos, 1.0);PSVertexColor = VertexColor;}";
+static const char* FragmentShaderGlsl = "#version 410\n\nin vec3 PSVertexColor;out vec4 FragColor;void main() {FragColor = vec4(PSVertexColor, 1);}";
 
 namespace Geometry {
     struct Vertex {
