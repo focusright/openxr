@@ -1,20 +1,17 @@
 #pragma comment( lib, "OpenGL32.lib" )
 
 #define no_init_all
-
 #define XR_USE_PLATFORM_WIN32
 #define XR_USE_GRAPHICS_API_OPENGL
 #define OPENGL_VERSION_MAJOR 4
 #define OPENGL_VERSION_MINOR 3
 #define GRAPHICS_API_OPENGL 1
 #define _USE_MATH_DEFINES
-#define APPLICATION_NAME "OpenXR OpenGL"
 
 #include <windows.h>
 #include <GL/gl.h>
 #include <GL/glext.h>
 #include <GL/wglext.h>
-#include <GL/gl_format.h>
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
 #include <common/xr_linear.h>
@@ -65,7 +62,7 @@ PFNWGLCREATECONTEXTATTRIBSARBPROC wglCreateContextAttribsARB;
 
 PROC GetExtension(const char *functionName) { return wglGetProcAddress(functionName); }
 
-void GlInitExtensions() {
+void init_opengl_extensions() {
     glAttachShader            = (PFNGLATTACHSHADERPROC)            GetExtension("glAttachShader"           );
     glBlitFramebuffer         = (PFNGLBLITFRAMEBUFFERPROC)         GetExtension("glBlitFramebuffer"        );
     glBindBuffer              = (PFNGLBINDBUFFERPROC)              GetExtension("glBindBuffer"             );
@@ -95,7 +92,7 @@ void GlInitExtensions() {
     glUseProgram              = (PFNGLUSEPROGRAMPROC)              GetExtension("glUseProgram"             );
 }
 
-LRESULT APIENTRY WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
+LRESULT APIENTRY wnd_proc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
     return DefWindowProcA(hWnd, message, wParam, lParam);
 }
 
@@ -111,18 +108,14 @@ void create_app_context() {
     int contextAttribs[] = {WGL_CONTEXT_MAJOR_VERSION_ARB, OPENGL_VERSION_MAJOR, WGL_CONTEXT_MINOR_VERSION_ARB, OPENGL_VERSION_MINOR, WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB, WGL_CONTEXT_FLAGS_ARB, WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB | WGL_CONTEXT_DEBUG_BIT_ARB, 0};
     hGLRC = wglCreateContextAttribsARB(hDC, NULL, contextAttribs);
     wglMakeCurrent(hDC, hGLRC);
-    GlInitExtensions();
+    init_opengl_extensions();
 }
 
 void create_app_window() {
-    DEVMODEA lpDevMode;
-    memset(&lpDevMode, 0, sizeof(DEVMODEA));
-    lpDevMode.dmSize = sizeof(DEVMODEA);
-    lpDevMode.dmDriverExtra = 0;
     hInstance = GetModuleHandleA(NULL);
     WNDCLASSA wc;
     wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
-    wc.lpfnWndProc = (WNDPROC)WndProc;
+    wc.lpfnWndProc = (WNDPROC)wnd_proc;
     wc.cbClsExtra = 0;
     wc.cbWndExtra = 0;
     wc.hInstance = hInstance;
@@ -130,7 +123,7 @@ void create_app_window() {
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
     wc.hbrBackground = NULL;
     wc.lpszMenuName = NULL;
-    wc.lpszClassName = APPLICATION_NAME;
+    wc.lpszClassName = "app";
     RegisterClassA(&wc);
     DWORD dwExStyle = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE;
     DWORD dwStyle = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
@@ -145,16 +138,14 @@ void create_app_window() {
 
     RECT desktopRect;
     GetWindowRect(GetDesktopWindow(), &desktopRect);
-
     const int offsetX = (desktopRect.right - (windowRect.right - windowRect.left)) / 2;
     const int offsetY = (desktopRect.bottom - (windowRect.bottom - windowRect.top)) / 2;
-
     windowRect.left += offsetX;
     windowRect.right += offsetX;
     windowRect.top += offsetY;
     windowRect.bottom += offsetY;
 
-    hWnd = CreateWindowExA(dwExStyle, APPLICATION_NAME, "", 
+    hWnd = CreateWindowExA(dwExStyle, "app", "", 
                                    dwStyle | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
                                    windowRect.left, windowRect.top,
                                    windowRect.right - windowRect.left,
@@ -173,7 +164,7 @@ void destroy_app_window() {
     wglDeleteContext(hGLRC);
     ReleaseDC(hWnd, hDC);
     DestroyWindow(hWnd);
-    UnregisterClassA(APPLICATION_NAME, hInstance);
+    UnregisterClassA("app", hInstance);
 }
 
 void device_init();
@@ -187,29 +178,22 @@ struct swapchain_t {
 };
 
 PFN_xrGetOpenGLGraphicsRequirementsKHR ext_xrGetOpenGLGraphicsRequirementsKHR = nullptr;
-PFN_xrCreateDebugUtilsMessengerEXT     ext_xrCreateDebugUtilsMessengerEXT     = nullptr;
-PFN_xrDestroyDebugUtilsMessengerEXT    ext_xrDestroyDebugUtilsMessengerEXT    = nullptr;
-
-XrFormFactor            app_config_form = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
+XrFormFactor app_config_form = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
 XrViewConfigurationType app_config_view = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
-
-const XrPosef  xr_pose_identity = { {0,0,0,1}, {0,0,0} };
-XrInstance     xr_instance      = {};
-XrSession      xr_session       = {};
+XrGraphicsBindingOpenGLWin32KHR m_graphicsBinding{XR_TYPE_GRAPHICS_BINDING_OPENGL_WIN32_KHR};
+const XrPosef xr_pose_identity = { {0,0,0,1}, {0,0,0} };
+XrInstance xr_instance = {};
+XrSession xr_session = {};
 XrSessionState xr_session_state = XR_SESSION_STATE_UNKNOWN;
-bool           xr_running       = false;
-XrSpace        xr_app_space     = {};
-XrSystemId     xr_system_id     = XR_NULL_SYSTEM_ID;
-XrEnvironmentBlendMode   xr_blend = {};
+bool xr_running = false;
+XrSpace xr_app_space = {};
+XrSystemId xr_system_id = XR_NULL_SYSTEM_ID;
+XrEnvironmentBlendMode xr_blend = {};
 XrDebugUtilsMessengerEXT xr_debug = {};
 XrSpaceLocation xr_fixed_space = {};
-
-vector<XrView>                  xr_views;
+vector<XrView> xr_views;
 vector<XrViewConfigurationView> xr_config_views;
-vector<swapchain_t>             xr_swapchains;
-
-int64_t gl_swapchain_fmt = GL_RGBA8;
-XrGraphicsBindingOpenGLWin32KHR m_graphicsBinding{XR_TYPE_GRAPHICS_BINDING_OPENGL_WIN32_KHR};
+vector<swapchain_t> xr_swapchains;
 
 bool openxr_init() {
 	vector<const char*> use_extensions;
@@ -226,7 +210,6 @@ bool openxr_init() {
 	printf("OpenXR extensions available:\n");
 	for (size_t i = 0; i < xr_exts.size(); i++) {
 		printf("- %s\n", xr_exts[i].extensionName);
-
 		for (int32_t ask = 0; ask < _countof(ask_extensions); ask++) {
 			if (strcmp(ask_extensions[ask], xr_exts[i].extensionName) == 0) {
 				use_extensions.push_back(ask_extensions[ask]);
@@ -235,11 +218,9 @@ bool openxr_init() {
 		}
 	}
 
-	if (!std::any_of( use_extensions.begin(), use_extensions.end(), 
-		[] (const char *ext) {
-			return strcmp(ext, XR_KHR_OPENGL_ENABLE_EXTENSION_NAME)==0;
-		}))
-		return false;
+	if (!std::any_of( use_extensions.begin(), use_extensions.end(), [] (const char *ext) {
+        return strcmp(ext, XR_KHR_OPENGL_ENABLE_EXTENSION_NAME)==0;
+	})) { return false; }
 
 	XrInstanceCreateInfo createInfo = { XR_TYPE_INSTANCE_CREATE_INFO };
 	createInfo.enabledExtensionCount      = use_extensions.size();
@@ -248,36 +229,8 @@ bool openxr_init() {
 	strcpy_s(createInfo.applicationInfo.applicationName, "bare bone");
 	xrCreateInstance(&createInfo, &xr_instance);
 
-	if (xr_instance == nullptr)
-		return false;
+    if (xr_instance == nullptr) { return false; }
 
-	xrGetInstanceProcAddr(xr_instance, "xrCreateDebugUtilsMessengerEXT",     (PFN_xrVoidFunction *)(&ext_xrCreateDebugUtilsMessengerEXT   ));
-	xrGetInstanceProcAddr(xr_instance, "xrDestroyDebugUtilsMessengerEXT",    (PFN_xrVoidFunction *)(&ext_xrDestroyDebugUtilsMessengerEXT  ));
-	xrGetInstanceProcAddr(xr_instance, "xrGetOpenGLGraphicsRequirementsKHR", (PFN_xrVoidFunction *)(&ext_xrGetOpenGLGraphicsRequirementsKHR));
-
-	XrDebugUtilsMessengerCreateInfoEXT debug_info = { XR_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT };
-	debug_info.messageTypes =
-		XR_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT     |
-		XR_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT  |
-		XR_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT |
-		XR_DEBUG_UTILS_MESSAGE_TYPE_CONFORMANCE_BIT_EXT;
-	debug_info.messageSeverities =
-		XR_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-		XR_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT    |
-		XR_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-		XR_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-	debug_info.userCallback = [](XrDebugUtilsMessageSeverityFlagsEXT severity, XrDebugUtilsMessageTypeFlagsEXT types, const XrDebugUtilsMessengerCallbackDataEXT *msg, void* user_data) {
-		printf("%s: %s\n", msg->functionName, msg->message);
-		char text[512];
-		sprintf_s(text, "%s: %s", msg->functionName, msg->message);
-		OutputDebugStringA(text);
-
-		return (XrBool32)XR_FALSE;
-	};
-
-	if (ext_xrCreateDebugUtilsMessengerEXT)
-		ext_xrCreateDebugUtilsMessengerEXT(xr_instance, &debug_info, &xr_debug);
-	
 	XrSystemGetInfo systemInfo = { XR_TYPE_SYSTEM_GET_INFO };
 	systemInfo.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
 	xrGetSystem(xr_instance, &systemInfo, &xr_system_id);
@@ -296,7 +249,6 @@ bool openxr_init() {
 	xrCreateSession(xr_instance, &sessionInfo, &xr_session);
 
 	if (xr_session == nullptr) { return false; }
-		
 
     XrReferenceSpaceCreateInfo referenceSpaceCreateInfo{XR_TYPE_REFERENCE_SPACE_CREATE_INFO};
     referenceSpaceCreateInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
@@ -440,7 +392,6 @@ void openxr_shutdown() {
 	xr_swapchains.clear();
     xrDestroySpace(xr_app_space);
     xrDestroySession(xr_session);
-    ext_xrDestroyDebugUtilsMessengerEXT(xr_debug);
     xrDestroyInstance(xr_instance);
     destroy_app_window();
 }
