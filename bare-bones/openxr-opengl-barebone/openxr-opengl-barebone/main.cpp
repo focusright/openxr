@@ -70,7 +70,6 @@ typedef struct {
     int windowHeight;
     int windowSwapInterval;
     float windowRefreshRate;
-    bool windowFullscreen;
     bool windowActive;
     bool windowExit;
 
@@ -141,21 +140,6 @@ void GlInitExtensions() {
     glUseProgram              = glUseProgram = (PFNGLUSEPROGRAMPROC)GetExtension("glUseProgram");
 }
 
-static void Error(const char *format, ...) {
-    char buffer[4096];
-    va_list args;
-    va_start(args, format);
-    vsnprintf_s(buffer, 4096, _TRUNCATE, format, args);
-    va_end(args);
-    OutputDebugStringA(buffer);
-}
-
-
-
-
-
-
-
 LRESULT APIENTRY WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
     return DefWindowProcA(hWnd, message, wParam, lParam);
 }
@@ -173,14 +157,8 @@ void ksGpuDevice_Destroy(ksGpuDevice *device) { memset(device, 0, sizeof(ksGpuDe
 
 void ksGpuContext_Destroy(ksGpuContext *context) {
     if (context->hGLRC) {
-        if (!wglMakeCurrent(NULL, NULL)) {
-            DWORD error = GetLastError();
-            Error("Failed to release context error code (%d).", error);
-        }
-        if (!wglDeleteContext(context->hGLRC)) {
-            DWORD error = GetLastError();
-            Error("Failed to delete context error code (%d).", error);
-        }
+        wglMakeCurrent(NULL, NULL);
+        wglDeleteContext(context->hGLRC);
         context->hGLRC = NULL;
     }
 }
@@ -189,29 +167,18 @@ void ksGpuWindow_Destroy(ksGpuWindow *window) {
     ksGpuContext_Destroy(&window->context);
     ksGpuDevice_Destroy(&window->device);
 
-    if (window->windowFullscreen) {
-        ChangeDisplaySettingsA(NULL, 0);
-        ShowCursor(TRUE);
-    }
-
     if (window->hDC) {
-        if (!ReleaseDC(window->hWnd, window->hDC)) {
-            Error("Failed to release device context.");
-        }
+        ReleaseDC(window->hWnd, window->hDC);
         window->hDC = NULL;
     }
 
     if (window->hWnd) {
-        if (!DestroyWindow(window->hWnd)) {
-            Error("Failed to destroy the window.");
-        }
+        DestroyWindow(window->hWnd);
         window->hWnd = NULL;
     }
 
     if (window->hInstance) {
-        if (!UnregisterClassA(APPLICATION_NAME, window->hInstance)) {
-            Error("Failed to unregister window class.");
-        }
+        UnregisterClassA(APPLICATION_NAME, window->hInstance);
         window->hInstance = NULL;
     }
 }
@@ -235,7 +202,7 @@ static bool ksGpuContext_CreateForSurface(ksGpuContext *context, HDC hDC) {
     return true;
 }
 
-bool ksGpuWindow_Create(ksGpuWindow *window, int width, int height, bool fullscreen) {
+bool ksGpuWindow_Create(ksGpuWindow *window, int width, int height) {
 
     ksDriverInstance driverInstance{};
     ksGpuQueueInfo queueInfo{};
@@ -246,27 +213,11 @@ bool ksGpuWindow_Create(ksGpuWindow *window, int width, int height, bool fullscr
     window->windowHeight = height;
     window->windowSwapInterval = 1;
     window->windowRefreshRate = 60.0f;
-    window->windowFullscreen = fullscreen;
     window->windowActive = false;
     window->windowExit = false;
     window->windowActiveState = false;
 
     const LPCSTR displayDevice = NULL;
-
-    if (window->windowFullscreen) {
-        DEVMODEA dmScreenSettings;
-        memset(&dmScreenSettings, 0, sizeof(dmScreenSettings));
-        dmScreenSettings.dmSize = sizeof(dmScreenSettings);
-        dmScreenSettings.dmPelsWidth = width;
-        dmScreenSettings.dmPelsHeight = height;
-        dmScreenSettings.dmBitsPerPel = 32;
-        dmScreenSettings.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT | DM_BITSPERPEL;
-
-        if (ChangeDisplaySettingsExA(displayDevice, &dmScreenSettings, NULL, CDS_FULLSCREEN, NULL) != DISP_CHANGE_SUCCESSFUL) {
-            Error("The requested fullscreen mode is not supported.");
-            return false;
-        }
-    }
 
     DEVMODEA lpDevMode;
     memset(&lpDevMode, 0, sizeof(DEVMODEA));
@@ -291,21 +242,13 @@ bool ksGpuWindow_Create(ksGpuWindow *window, int width, int height, bool fullscr
     wc.lpszMenuName = NULL;
     wc.lpszClassName = APPLICATION_NAME;
 
-    if (!RegisterClassA(&wc)) {
-        Error("Failed to register window class.");
-        return false;
-    }
+    RegisterClassA(&wc);
 
     DWORD dwExStyle = 0;
     DWORD dwStyle = 0;
-    if (window->windowFullscreen) {
-        dwExStyle = WS_EX_APPWINDOW;
-        dwStyle = WS_POPUP;
-        ShowCursor(FALSE);
-    } else {
-        dwExStyle = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE;
-        dwStyle = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
-    }
+
+    dwExStyle = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE;
+    dwStyle = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX;
 
     RECT windowRect;
     windowRect.left = (long)0;
@@ -315,18 +258,16 @@ bool ksGpuWindow_Create(ksGpuWindow *window, int width, int height, bool fullscr
 
     AdjustWindowRectEx(&windowRect, dwStyle, FALSE, dwExStyle);
 
-    if (!window->windowFullscreen) {
-        RECT desktopRect;
-        GetWindowRect(GetDesktopWindow(), &desktopRect);
+    RECT desktopRect;
+    GetWindowRect(GetDesktopWindow(), &desktopRect);
 
-        const int offsetX = (desktopRect.right - (windowRect.right - windowRect.left)) / 2;
-        const int offsetY = (desktopRect.bottom - (windowRect.bottom - windowRect.top)) / 2;
+    const int offsetX = (desktopRect.right - (windowRect.right - windowRect.left)) / 2;
+    const int offsetY = (desktopRect.bottom - (windowRect.bottom - windowRect.top)) / 2;
 
-        windowRect.left += offsetX;
-        windowRect.right += offsetX;
-        windowRect.top += offsetY;
-        windowRect.bottom += offsetY;
-    }
+    windowRect.left += offsetX;
+    windowRect.right += offsetX;
+    windowRect.top += offsetY;
+    windowRect.bottom += offsetY;
 
     window->hWnd = CreateWindowExA(dwExStyle,                         
                                    APPLICATION_NAME, "", dwStyle|WS_CLIPSIBLINGS|WS_CLIPCHILDREN,
@@ -336,7 +277,7 @@ bool ksGpuWindow_Create(ksGpuWindow *window, int width, int height, bool fullscr
                                    NULL, NULL, window->hInstance, NULL);
     if (!window->hWnd) {
         ksGpuWindow_Destroy(window);
-        Error("Failed to create window.");
+        printf("Failed to create window.");
         return false;
     }
 
@@ -345,7 +286,7 @@ bool ksGpuWindow_Create(ksGpuWindow *window, int width, int height, bool fullscr
     window->hDC = GetDC(window->hWnd);
     if (!window->hDC) {
         ksGpuWindow_Destroy(window);
-        Error("Failed to acquire device context.");
+        printf("Failed to acquire device context.");
         return false;
     }
 
@@ -740,7 +681,7 @@ void device_init() {
     xrGetInstanceProcAddr(xr_instance, "xrGetOpenGLGraphicsRequirementsKHR", reinterpret_cast<PFN_xrVoidFunction*>(&pfnGetOpenGLGraphicsRequirementsKHR));
     XrGraphicsRequirementsOpenGLKHR graphicsRequirements{XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_KHR};
     pfnGetOpenGLGraphicsRequirementsKHR(xr_instance, xr_system_id, &graphicsRequirements);
-    ksGpuWindow_Create(&window, 640, 480, false);
+    ksGpuWindow_Create(&window, 640, 480);
     m_graphicsBinding.hDC = window.context.hDC;
     m_graphicsBinding.hGLRC = window.context.hGLRC;
 }
