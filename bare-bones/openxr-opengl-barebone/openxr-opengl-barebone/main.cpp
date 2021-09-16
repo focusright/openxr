@@ -1016,13 +1016,13 @@ void openxr_shutdown() {
 ksGpuWindow window{};
 
 void device_init() {
-        PFN_xrGetOpenGLGraphicsRequirementsKHR pfnGetOpenGLGraphicsRequirementsKHR = nullptr;
-        xrGetInstanceProcAddr(xr_instance, "xrGetOpenGLGraphicsRequirementsKHR", reinterpret_cast<PFN_xrVoidFunction*>(&pfnGetOpenGLGraphicsRequirementsKHR));
-        XrGraphicsRequirementsOpenGLKHR graphicsRequirements{XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_KHR};
-        pfnGetOpenGLGraphicsRequirementsKHR(xr_instance, xr_system_id, &graphicsRequirements);
-        ksGpuWindow_Create(&window, 640, 480, false);
-        m_graphicsBinding.hDC = window.context.hDC;
-        m_graphicsBinding.hGLRC = window.context.hGLRC;
+    PFN_xrGetOpenGLGraphicsRequirementsKHR pfnGetOpenGLGraphicsRequirementsKHR = nullptr;
+    xrGetInstanceProcAddr(xr_instance, "xrGetOpenGLGraphicsRequirementsKHR", reinterpret_cast<PFN_xrVoidFunction*>(&pfnGetOpenGLGraphicsRequirementsKHR));
+    XrGraphicsRequirementsOpenGLKHR graphicsRequirements{XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_KHR};
+    pfnGetOpenGLGraphicsRequirementsKHR(xr_instance, xr_system_id, &graphicsRequirements);
+    ksGpuWindow_Create(&window, 640, 480, false);
+    m_graphicsBinding.hDC = window.context.hDC;
+    m_graphicsBinding.hGLRC = window.context.hGLRC;
 }
 
 
@@ -1078,8 +1078,6 @@ namespace Geometry {
     constexpr XrVector3f RTB{0.5f, 0.5f, -0.5f};
     constexpr XrVector3f RTF{0.5f, 0.5f, 0.5f};
 
-    #define CUBE_SIDE(V1, V2, V3, V4, V5, V6, COLOR) {V1, COLOR}, {V2, COLOR}, {V3, COLOR}, {V4, COLOR}, {V5, COLOR}, {V6, COLOR},
-
     Vertex c_cubeVertices[] = {
         {LTB, DarkRed}, {LBF, DarkRed}, {LBB, DarkRed}, {LTB, DarkRed}, {LTF, DarkRed}, {LBF, DarkRed},
         {RTB, Red}, {RBB, Red}, {RBF, Red}, {RTB, Red}, {RBF, Red}, {RTF, Red},
@@ -1092,7 +1090,7 @@ namespace Geometry {
         0,  1,  2,  3,  4,  5, 6,  7,  8,  9,  10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35,
     };
 
-    Vertex c_planeVertices[] = { CUBE_SIDE(LTB, RTB, RTF, LTB, RTF, LTF, DarkGreen) };
+    Vertex c_planeVertices[] = { {LTB,DarkGreen}, {RTB,DarkGreen}, {RTF,DarkGreen}, {LTB,DarkGreen}, {RTF,DarkGreen}, {LTF,DarkGreen} };
     unsigned short c_planeIndices[] = { 0,  1,  2,  3,  4,  5 };
 
     Vertex c_sphereVertices[] = {
