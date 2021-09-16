@@ -1003,7 +1003,7 @@ struct Cube {
 };
 
 void device_init(); //function protocols for openxr_init() to see
-void opengl_render_layer(const XrCompositionLayerProjectionView& layerView, const XrSwapchainImageOpenGLKHR* swapchainImage, const std::vector<Cube>& cubes, int index);
+void opengl_render_layer(const XrCompositionLayerProjectionView& layerView, const XrSwapchainImageOpenGLKHR* swapchainImage, int index);
 
 struct swapchain_t {
 	XrSwapchain handle;
@@ -1030,8 +1030,6 @@ PFN_xrDestroyDebugUtilsMessengerEXT    ext_xrDestroyDebugUtilsMessengerEXT    = 
 
 XrFormFactor            app_config_form = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
 XrViewConfigurationType app_config_view = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
-
-vector<XrPosef> app_cubes;
 
 const XrPosef  xr_pose_identity = { {0,0,0,1}, {0,0,0} };
 XrInstance     xr_instance      = {};
@@ -1192,7 +1190,7 @@ bool openxr_init() {
 		ext_xrCreateDebugUtilsMessengerEXT(xr_instance, &debug_info, &xr_debug);
 	
 	XrSystemGetInfo systemInfo = { XR_TYPE_SYSTEM_GET_INFO };
-	systemInfo.formFactor = app_config_form;
+	systemInfo.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
 	xrGetSystem(xr_instance, &systemInfo, &xr_system_id);
 
 	uint32_t blend_count = 0;
@@ -1303,38 +1301,6 @@ bool openxr_render_layer(XrTime predictedDisplayTime, vector<XrCompositionLayerP
 	xrLocateViews(xr_session, &locate_info, &view_state, (uint32_t)xr_views.size(), &view_count, xr_views.data());
 	views.resize(view_count);
 
-    std::vector<Cube> cubes;
-    XrResult res;
-    for (XrSpace visualizedSpace : m_visualizedSpaces) {
-        XrSpaceLocation spaceLocation{XR_TYPE_SPACE_LOCATION};
-        res = xrLocateSpace(visualizedSpace, xr_app_space, predictedDisplayTime, &spaceLocation);
-        if (XR_UNQUALIFIED_SUCCESS(res)) {
-            if ((spaceLocation.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0 &&
-                (spaceLocation.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) != 0) {
-                cubes.push_back(Cube{spaceLocation.pose, {0.25f, 0.25f, 0.25f}});
-            }
-            xr_fixed_space = spaceLocation;
-        } else {
-            printf("Unable to locate a visualized reference space in app space: %d", res);
-        }
-    }
-
-    for (auto hand : {Side::LEFT, Side::RIGHT}) {
-        XrSpaceLocation spaceLocation{XR_TYPE_SPACE_LOCATION};
-        res = xrLocateSpace(xr_input.handSpace[hand], xr_app_space, predictedDisplayTime, &spaceLocation);
-        if (XR_UNQUALIFIED_SUCCESS(res)) {
-            if ((spaceLocation.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) != 0 &&
-                (spaceLocation.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT) != 0) {
-                cubes.push_back(Cube{spaceLocation.pose, {0.1f, 0.1f, 0.1f}});
-            }
-        } else {
-            if (xr_input.handActive[hand] == XR_TRUE) {
-                const char* handName[] = {"left", "right"};
-                printf("Unable to locate %s hand action space in app space: %d", handName[hand], res);
-            }
-        }
-    }
-
 	for (uint32_t i = 0; i < view_count; i++) {
 		uint32_t img_id;
 		XrSwapchainImageAcquireInfo acquire_info = { XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO };
@@ -1352,7 +1318,7 @@ bool openxr_render_layer(XrTime predictedDisplayTime, vector<XrCompositionLayerP
 		views[i].subImage.imageRect.extent = { xr_swapchains[i].width, xr_swapchains[i].height };
 
         const XrSwapchainImageOpenGLKHR* const swapchainImage = &xr_swapchains[i].surface_images[img_id];
-        opengl_render_layer(views[i], swapchainImage, cubes, i);
+        opengl_render_layer(views[i], swapchainImage, i);
 
 		XrSwapchainImageReleaseInfo release_info = { XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO };
 		xrReleaseSwapchainImage(xr_swapchains[i].handle, &release_info);
@@ -1549,46 +1515,21 @@ namespace Geometry {
     };
 }
 
-void CheckShader(GLuint shader) {
-    GLint r = 0;
-    glGetShaderiv(shader, GL_COMPILE_STATUS, &r);
-    if (r == GL_FALSE) {
-        GLchar msg[4096] = {};
-        GLsizei length;
-        glGetShaderInfoLog(shader, sizeof(msg), &length, msg);
-        throw std::logic_error("Compile shader failed: " + string(msg));
-    }
-}
-
-void CheckProgram(GLuint prog) {
-    GLint r = 0;
-    glGetProgramiv(prog, GL_LINK_STATUS, &r);
-    if (r == GL_FALSE) {
-        GLchar msg[4096] = {};
-        GLsizei length;
-        glGetProgramInfoLog(prog, sizeof(msg), &length, msg);
-        throw std::logic_error("Link program failed: " + string(msg));
-    }
-}
-
 void opengl_init() {
         glGenFramebuffers(1, &m_swapchainFramebuffer);
 
         GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
         glShaderSource(vertexShader, 1, &VertexShaderGlsl, nullptr);
         glCompileShader(vertexShader);
-        CheckShader(vertexShader);
 
         GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
         glShaderSource(fragmentShader, 1, &FragmentShaderGlsl, nullptr);
         glCompileShader(fragmentShader);
-        CheckShader(fragmentShader);
 
         m_program = glCreateProgram();
         glAttachShader(m_program, vertexShader);
         glAttachShader(m_program, fragmentShader);
         glLinkProgram(m_program);
-        CheckProgram(m_program);
 
         glDeleteShader(vertexShader);
         glDeleteShader(fragmentShader);
@@ -1661,10 +1602,10 @@ uint32_t GetDepthTexture(uint32_t colorTexture) {
     return depthTexture;
 }
 
-template <typename T, size_t Size> // The equivalent of C++17 std::size. A helper to get the dimension for an array.
+template <typename T, size_t Size>
 constexpr size_t ArraySize(const T (&/*unused*/)[Size]) noexcept { return Size; }
 
-void opengl_render_layer(const XrCompositionLayerProjectionView& layerView, const XrSwapchainImageOpenGLKHR* swapchainImage, const std::vector<Cube>& cubes, int index) {
+void opengl_render_layer(const XrCompositionLayerProjectionView& layerView, const XrSwapchainImageOpenGLKHR* swapchainImage, int index) {
         glBindFramebuffer(GL_FRAMEBUFFER, m_swapchainFramebuffer);
 
         const uint32_t colorTexture = reinterpret_cast<const XrSwapchainImageOpenGLKHR*>(swapchainImage)->image;
@@ -1714,7 +1655,6 @@ void opengl_render_layer(const XrCompositionLayerProjectionView& layerView, cons
         //plane
         XrVector3f plane_scale{5.f, 5.f, 5.f};
         XrVector3f plane_position{0.f, -4.f, 0.f};
-
         glBindBuffer(GL_ARRAY_BUFFER, m_planeVertexBuffer);
         glVertexAttribPointer(m_vertexAttribCoords, 3, GL_FLOAT, GL_FALSE, sizeof(Geometry::Vertex), nullptr);
         glVertexAttribPointer(m_vertexAttribColor, 3, GL_FLOAT, GL_FALSE, sizeof(Geometry::Vertex), reinterpret_cast<const void*>(sizeof(XrVector3f)));
@@ -1725,16 +1665,16 @@ void opengl_render_layer(const XrCompositionLayerProjectionView& layerView, cons
         glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(ArraySize(Geometry::c_planeIndices)), GL_UNSIGNED_SHORT, nullptr);
 
         //cube
+        XrVector3f cube_position{-.2f, 0.f, -1.f};
+        XrVector3f cube_scale{ .25f, .25f, .25f };
         glBindBuffer(GL_ARRAY_BUFFER, m_cubeVertexBuffer);
         glVertexAttribPointer(m_vertexAttribCoords, 3, GL_FLOAT, GL_FALSE, sizeof(Geometry::Vertex), nullptr);
         glVertexAttribPointer(m_vertexAttribColor, 3, GL_FLOAT, GL_FALSE, sizeof(Geometry::Vertex), reinterpret_cast<const void*>(sizeof(XrVector3f)));
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_cubeIndexBuffer);
-        for (const Cube& cube : cubes) {
-            XrMatrix4x4f_CreateTranslationRotationScale(&model, &cube.Pose.position, &cube.Pose.orientation, &cube.Scale);
-            XrMatrix4x4f_Multiply(&mvp, &vp, &model);
-            glUniformMatrix4fv(m_modelViewProjectionUniformLocation, 1, GL_FALSE, reinterpret_cast<const GLfloat*>(&mvp));
-            glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(ArraySize(Geometry::c_cubeIndices)), GL_UNSIGNED_SHORT, nullptr);
-        }
+        XrMatrix4x4f_CreateTranslationRotationScale(&model, &cube_position, &zero_quaternion, &cube_scale);
+        XrMatrix4x4f_Multiply(&mvp, &vp, &model);
+        glUniformMatrix4fv(m_modelViewProjectionUniformLocation, 1, GL_FALSE, reinterpret_cast<const GLfloat*>(&mvp));
+        glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(ArraySize(Geometry::c_cubeIndices)), GL_UNSIGNED_SHORT, nullptr);
 
         //sphere
         XrVector3f sphere_scale{.25f, .25f, .25f};
