@@ -37,21 +37,6 @@ typedef INT_PTR (WINAPI *PROC)();
 typedef uint64_t ksNanoseconds;
 
 typedef enum {
-    KS_GPU_SURFACE_COLOR_FORMAT_R5G6B5,
-    KS_GPU_SURFACE_COLOR_FORMAT_B5G6R5,
-    KS_GPU_SURFACE_COLOR_FORMAT_R8G8B8A8,
-    KS_GPU_SURFACE_COLOR_FORMAT_B8G8R8A8,
-    KS_GPU_SURFACE_COLOR_FORMAT_MAX
-} ksGpuSurfaceColorFormat;
-
-typedef enum {
-    KS_GPU_SURFACE_DEPTH_FORMAT_NONE,
-    KS_GPU_SURFACE_DEPTH_FORMAT_D16,
-    KS_GPU_SURFACE_DEPTH_FORMAT_D24,
-    KS_GPU_SURFACE_DEPTH_FORMAT_MAX
-} ksGpuSurfaceDepthFormat;
-
-typedef enum {
     KS_GPU_SAMPLE_COUNT_1 = 1,
     KS_GPU_SAMPLE_COUNT_2 = 2,
     KS_GPU_SAMPLE_COUNT_4 = 4,
@@ -72,15 +57,6 @@ typedef enum { KS_GPU_QUEUE_PRIORITY_LOW, KS_GPU_QUEUE_PRIORITY_MEDIUM, KS_GPU_Q
 typedef struct {
     int placeholder;
 } ksDriverInstance;
-
-typedef struct {
-    unsigned char redBits;
-    unsigned char greenBits;
-    unsigned char blueBits;
-    unsigned char alphaBits;
-    unsigned char colorBits;
-    unsigned char depthBits;
-} ksGpuSurfaceBits;
 
 typedef struct {
     bool keyInput[256];
@@ -109,8 +85,6 @@ typedef struct {
 typedef struct {
     ksGpuDevice device;
     ksGpuContext context;
-    ksGpuSurfaceColorFormat colorFormat;
-    ksGpuSurfaceDepthFormat depthFormat;
     ksGpuSampleCount sampleCount;
     int windowWidth;
     int windowHeight;
@@ -120,7 +94,6 @@ typedef struct {
     bool windowActive;
     bool windowExit;
     ksGpuWindowInput input;
-    ksNanoseconds lastSwapTime;
 
     HINSTANCE hInstance;
     HDC hDC;
@@ -418,24 +391,6 @@ void GlInitExtensions() {
     glExtensions.texture_clamp_to_border_id = GL_CLAMP_TO_BORDER;
 }
 
-static ksNanoseconds GetTimeNanoseconds() {
-    static ksNanoseconds ticksPerSecond = 0;
-    static ksNanoseconds timeBase = 0;
-
-    if (ticksPerSecond == 0) {
-        LARGE_INTEGER li;
-        QueryPerformanceFrequency(&li);
-        ticksPerSecond = (ksNanoseconds)li.QuadPart;
-        QueryPerformanceCounter(&li);
-        timeBase = (ksNanoseconds)li.LowPart + 0xFFFFFFFFULL * li.HighPart;
-    }
-
-    LARGE_INTEGER li;
-    QueryPerformanceCounter(&li);
-    ksNanoseconds counter = (ksNanoseconds)li.LowPart + 0xFFFFFFFFULL * li.HighPart;
-    return (counter - timeBase) * 1000ULL * 1000ULL * 1000ULL / ticksPerSecond;
-}
-
 static void Error(const char *format, ...) {
     char buffer[4096];
     va_list args;
@@ -443,17 +398,6 @@ static void Error(const char *format, ...) {
     vsnprintf_s(buffer, 4096, _TRUNCATE, format, args);
     va_end(args);
     OutputDebugStringA(buffer);
-}
-
-ksGpuSurfaceBits ksGpuContext_BitsForSurfaceFormat(const ksGpuSurfaceColorFormat colorFormat, const ksGpuSurfaceDepthFormat depthFormat) {
-    ksGpuSurfaceBits bits;
-    bits.redBits = 8;
-    bits.greenBits = 8;
-    bits.blueBits = 8;
-    bits.alphaBits = 8;
-    bits.colorBits = bits.redBits + bits.greenBits + bits.blueBits + bits.alphaBits;
-    bits.depthBits = 24;
-    return bits;
 }
 
 void GlBootstrapExtensions() {
@@ -528,72 +472,25 @@ void ksGpuWindow_Destroy(ksGpuWindow *window) {
     }
 }
 
-static bool ksGpuContext_CreateForSurface(ksGpuContext *context, const ksGpuDevice *device,
-                                          const ksGpuSurfaceColorFormat colorFormat, const ksGpuSurfaceDepthFormat depthFormat,
-                                          const ksGpuSampleCount sampleCount, HINSTANCE hInstance, HDC hDC) {
+
+
+static bool ksGpuContext_CreateForSurface(ksGpuContext *context, const ksGpuDevice *device, const ksGpuSampleCount sampleCount, HINSTANCE hInstance, HDC hDC) {
     context->device = device;
 
-    const ksGpuSurfaceBits bits = ksGpuContext_BitsForSurfaceFormat(colorFormat, depthFormat);
-
-    PIXELFORMATDESCRIPTOR pfd = {
-        sizeof(PIXELFORMATDESCRIPTOR),
-        1,                        // version
-        PFD_DRAW_TO_WINDOW |      // must support windowed
-            PFD_SUPPORT_OPENGL |  // must support OpenGL
-            PFD_DOUBLEBUFFER,     // must support double buffering
-        PFD_TYPE_RGBA,            // iPixelType
-        bits.colorBits,           // cColorBits
-        0,
-        0,  // cRedBits, cRedShift
-        0,
-        0,  // cGreenBits, cGreenShift
-        0,
-        0,  // cBlueBits, cBlueShift
-        0,
-        0,               // cAlphaBits, cAlphaShift
-        0,               // cAccumBits
-        0,               // cAccumRedBits
-        0,               // cAccumGreenBits
-        0,               // cAccumBlueBits
-        0,               // cAccumAlphaBits
-        bits.depthBits,  // cDepthBits
-        0,               // cStencilBits
-        0,               // cAuxBuffers
-        PFD_MAIN_PLANE,  // iLayerType
-        0,               // bReserved
-        0,               // dwLayerMask
-        0,               // dwVisibleMask
-        0                // dwDamageMask
-    };
+    PIXELFORMATDESCRIPTOR pfd = { sizeof(PIXELFORMATDESCRIPTOR), 1, PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,  PFD_TYPE_RGBA, 
+        32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, PFD_MAIN_PLANE, 0, 0, 0, 0 };
 
     HWND localWnd = NULL;
     HDC localDC = hDC;
 
-    if (sampleCount > KS_GPU_SAMPLE_COUNT_1) {
-        localWnd = CreateWindowA(APPLICATION_NAME, "temp", 0, 0, 0, 0, 0, NULL, NULL, hInstance, NULL);
-        localDC = GetDC(localWnd);
-    }
-
     int pixelFormat = ChoosePixelFormat(localDC, &pfd);
-    if (pixelFormat == 0) {
-        Error("Failed to find a suitable pixel format.");
-        return false;
-    }
+    SetPixelFormat(localDC, pixelFormat, &pfd);
+    HGLRC hGLRC = wglCreateContext(localDC);
+    wglMakeCurrent(localDC, hGLRC);
+    GlBootstrapExtensions();
+    wglMakeCurrent(NULL, NULL);
+    wglDeleteContext(hGLRC);
 
-    if (!SetPixelFormat(localDC, pixelFormat, &pfd)) {
-        Error("Failed to set the pixel format.");
-        return false;
-    }
-
-    {
-        HGLRC hGLRC = wglCreateContext(localDC);
-        wglMakeCurrent(localDC, hGLRC);
-
-        GlBootstrapExtensions();
-
-        wglMakeCurrent(NULL, NULL);
-        wglDeleteContext(hGLRC);
-    }
 
     if (sampleCount > KS_GPU_SAMPLE_COUNT_1) {
         ReleaseDC(localWnd, localDC);
@@ -608,9 +505,9 @@ static bool ksGpuContext_CreateForSurface(ksGpuContext *context, const ksGpuDevi
                                     WGL_PIXEL_TYPE_ARB,
                                     WGL_TYPE_RGBA_ARB,
                                     WGL_COLOR_BITS_ARB,
-                                    bits.colorBits,
+                                    32,
                                     WGL_DEPTH_BITS_ARB,
-                                    bits.depthBits,
+                                    24,
                                     WGL_SAMPLE_BUFFERS_ARB,
                                     1,
                                     WGL_SAMPLES_ARB,
@@ -665,14 +562,10 @@ bool ksGpuWindow_Create(ksGpuWindow *window, int width, int height, bool fullscr
 
     ksDriverInstance driverInstance{};
     ksGpuQueueInfo queueInfo{};
-    ksGpuSurfaceColorFormat colorFormat{KS_GPU_SURFACE_COLOR_FORMAT_B8G8R8A8};
-    ksGpuSurfaceDepthFormat depthFormat{KS_GPU_SURFACE_DEPTH_FORMAT_D24};
     ksGpuSampleCount sampleCount{KS_GPU_SAMPLE_COUNT_1};
 
     memset(window, 0, sizeof(ksGpuWindow));
 
-    window->colorFormat = colorFormat;
-    window->depthFormat = depthFormat;
     window->sampleCount = sampleCount;
     window->windowWidth = width;
     window->windowHeight = height;
@@ -682,7 +575,6 @@ bool ksGpuWindow_Create(ksGpuWindow *window, int width, int height, bool fullscr
     window->windowActive = false;
     window->windowExit = false;
     window->windowActiveState = false;
-    window->lastSwapTime = GetTimeNanoseconds();
 
     const LPCSTR displayDevice = NULL;
 
@@ -791,8 +683,9 @@ bool ksGpuWindow_Create(ksGpuWindow *window, int width, int height, bool fullscr
     }
 
     ksGpuDevice_Create(&window->device, &driverInstance, &queueInfo);
-    ksGpuContext_CreateForSurface(&window->context, &window->device, colorFormat, depthFormat, sampleCount,
-                                  window->hInstance, window->hDC);
+
+    ksGpuContext_CreateForSurface(&window->context, &window->device, sampleCount, window->hInstance, window->hDC);
+
     ksGpuContext_SetCurrent(&window->context);
 
     ShowWindow(window->hWnd, SW_SHOW);
