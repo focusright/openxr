@@ -29,22 +29,10 @@ using namespace std;
 #define MAX_QUEUES 16
 #define BIT(x) (1 << (x))
 #define UNUSED_PARM(x) { (void)(x); }
-#define APPLICATION_NAME "OpenGL SI"
-#define WINDOW_TITLE "OpenGL SI"
+#define APPLICATION_NAME "OpenXR OpenGL"
 #define GL(func) func;
 
 typedef INT_PTR (WINAPI *PROC)();
-typedef uint64_t ksNanoseconds;
-
-typedef enum {
-    KS_GPU_SAMPLE_COUNT_1 = 1,
-    KS_GPU_SAMPLE_COUNT_2 = 2,
-    KS_GPU_SAMPLE_COUNT_4 = 4,
-    KS_GPU_SAMPLE_COUNT_8 = 8,
-    KS_GPU_SAMPLE_COUNT_16 = 16,
-    KS_GPU_SAMPLE_COUNT_32 = 32,
-    KS_GPU_SAMPLE_COUNT_64 = 64,
-} ksGpuSampleCount;
 
 typedef enum {
     KS_GPU_QUEUE_PROPERTY_GRAPHICS = BIT(0),
@@ -78,7 +66,6 @@ typedef struct {
 typedef struct {
     ksGpuDevice device;
     ksGpuContext context;
-    ksGpuSampleCount sampleCount;
     int windowWidth;
     int windowHeight;
     int windowSwapInterval;
@@ -252,11 +239,9 @@ bool ksGpuWindow_Create(ksGpuWindow *window, int width, int height, bool fullscr
 
     ksDriverInstance driverInstance{};
     ksGpuQueueInfo queueInfo{};
-    ksGpuSampleCount sampleCount{KS_GPU_SAMPLE_COUNT_1};
 
     memset(window, 0, sizeof(ksGpuWindow));
 
-    window->sampleCount = sampleCount;
     window->windowWidth = width;
     window->windowHeight = height;
     window->windowSwapInterval = 1;
@@ -343,20 +328,12 @@ bool ksGpuWindow_Create(ksGpuWindow *window, int width, int height, bool fullscr
         windowRect.bottom += offsetY;
     }
 
-    window->hWnd = CreateWindowExA(dwExStyle,                           // Extended style for the window
-                                   APPLICATION_NAME,                    // Class name
-                                   WINDOW_TITLE,                        // Window title
-                                   dwStyle |                            // Defined window style
-                                       WS_CLIPSIBLINGS |                // Required window style
-                                       WS_CLIPCHILDREN,                 // Required window style
-                                   windowRect.left,                     // Window X position
-                                   windowRect.top,                      // Window Y position
-                                   windowRect.right - windowRect.left,  // Window width
-                                   windowRect.bottom - windowRect.top,  // Window height
-                                   NULL,                                // No parent window
-                                   NULL,                                // No menu
-                                   window->hInstance,                   // Instance
-                                   NULL);                               // No WM_CREATE parameter
+    window->hWnd = CreateWindowExA(dwExStyle,                         
+                                   APPLICATION_NAME, "", dwStyle|WS_CLIPSIBLINGS|WS_CLIPCHILDREN,
+                                   windowRect.left, windowRect.top,
+                                   windowRect.right - windowRect.left,
+                                   windowRect.bottom - windowRect.top,
+                                   NULL, NULL, window->hInstance, NULL);
     if (!window->hWnd) {
         ksGpuWindow_Destroy(window);
         Error("Failed to create window.");
