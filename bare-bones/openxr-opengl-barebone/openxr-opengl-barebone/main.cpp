@@ -58,7 +58,6 @@ typedef struct {
 } ksGpuDevice;
 
 typedef struct {
-    const ksGpuDevice *device;
     HDC hDC;
     HGLRC hGLRC;
 } ksGpuContext;
@@ -68,15 +67,10 @@ typedef struct {
     ksGpuContext context;
     int windowWidth;
     int windowHeight;
-    int windowSwapInterval;
-    float windowRefreshRate;
-    bool windowActive;
-    bool windowExit;
 
     HINSTANCE hInstance;
     HDC hDC;
     HWND hWnd;
-    bool windowActiveState;
 } ksGpuWindow;
 
 PROC GetExtension(const char *functionName) { return wglGetProcAddress(functionName); }
@@ -143,6 +137,8 @@ void GlInitExtensions() {
 LRESULT APIENTRY WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
     return DefWindowProcA(hWnd, message, wParam, lParam);
 }
+
+ksGpuWindow window{};
 
 bool ksGpuDevice_Create(ksGpuDevice *device, ksDriverInstance *instance, const ksGpuQueueInfo *queueInfo) {
     memset(device, 0, sizeof(ksGpuDevice));
@@ -211,11 +207,6 @@ bool ksGpuWindow_Create(ksGpuWindow *window, int width, int height) {
 
     window->windowWidth = width;
     window->windowHeight = height;
-    window->windowSwapInterval = 1;
-    window->windowRefreshRate = 60.0f;
-    window->windowActive = false;
-    window->windowExit = false;
-    window->windowActiveState = false;
 
     const LPCSTR displayDevice = NULL;
 
@@ -223,10 +214,6 @@ bool ksGpuWindow_Create(ksGpuWindow *window, int width, int height) {
     memset(&lpDevMode, 0, sizeof(DEVMODEA));
     lpDevMode.dmSize = sizeof(DEVMODEA);
     lpDevMode.dmDriverExtra = 0;
-
-    if (EnumDisplaySettingsA(displayDevice, ENUM_CURRENT_SETTINGS, &lpDevMode) != FALSE) {
-        window->windowRefreshRate = (float)lpDevMode.dmDisplayFrequency;
-    }
 
     window->hInstance = GetModuleHandleA(NULL);
 
@@ -302,68 +289,6 @@ bool ksGpuWindow_Create(ksGpuWindow *window, int width, int height) {
 
     return true;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 void device_init();
@@ -663,19 +588,6 @@ void openxr_shutdown() {
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-ksGpuWindow window{};
-
 void device_init() {
     PFN_xrGetOpenGLGraphicsRequirementsKHR pfnGetOpenGLGraphicsRequirementsKHR = nullptr;
     xrGetInstanceProcAddr(xr_instance, "xrGetOpenGLGraphicsRequirementsKHR", reinterpret_cast<PFN_xrVoidFunction*>(&pfnGetOpenGLGraphicsRequirementsKHR));
@@ -685,8 +597,6 @@ void device_init() {
     m_graphicsBinding.hDC = window.context.hDC;
     m_graphicsBinding.hGLRC = window.context.hGLRC;
 }
-
-
 
 GLuint m_swapchainFramebuffer{0};
 GLuint m_program{0};
