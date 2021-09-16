@@ -353,9 +353,9 @@ bool openxr_render_layer(XrTime predictedDisplayTime, vector<XrCompositionLayerP
 		xrReleaseSwapchainImage(xr_swapchains[i].handle, &release_info);
 	}
 
-	layer.space     = xr_app_space;
+	layer.space = xr_app_space;
 	layer.viewCount = (uint32_t)views.size();
-	layer.views     = views.data();
+	layer.views = views.data();
 	return true;
 }
 
@@ -364,8 +364,8 @@ void openxr_render_frame() {
 	xrWaitFrame (xr_session, nullptr, &frame_state);
 	xrBeginFrame(xr_session, nullptr);
 
-	XrCompositionLayerBaseHeader            *layer      = nullptr;
-	XrCompositionLayerProjection             layer_proj = { XR_TYPE_COMPOSITION_LAYER_PROJECTION };
+	XrCompositionLayerBaseHeader *layer = nullptr;
+	XrCompositionLayerProjection layer_proj = { XR_TYPE_COMPOSITION_LAYER_PROJECTION };
 	vector<XrCompositionLayerProjectionView> views;
 	bool session_active = xr_session_state == XR_SESSION_STATE_VISIBLE || xr_session_state == XR_SESSION_STATE_FOCUSED;
 
@@ -374,10 +374,10 @@ void openxr_render_frame() {
 	}
 
 	XrFrameEndInfo end_info{ XR_TYPE_FRAME_END_INFO };
-	end_info.displayTime          = frame_state.predictedDisplayTime;
+	end_info.displayTime = frame_state.predictedDisplayTime;
 	end_info.environmentBlendMode = xr_blend;
-	end_info.layerCount           = layer == nullptr ? 0 : 1;
-	end_info.layers               = &layer;
+	end_info.layerCount = layer == nullptr ? 0 : 1;
+	end_info.layers = &layer;
 	xrEndFrame(xr_session, &end_info);
 }
 
