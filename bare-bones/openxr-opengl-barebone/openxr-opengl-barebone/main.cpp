@@ -211,12 +211,6 @@ vector<swapchain_t>             xr_swapchains;
 int64_t gl_swapchain_fmt = GL_RGBA8;
 XrGraphicsBindingOpenGLWin32KHR m_graphicsBinding{XR_TYPE_GRAPHICS_BINDING_OPENGL_WIN32_KHR};
 
-namespace Side {
-    const int LEFT = 0;
-    const int RIGHT = 1;
-    const int COUNT = 2;
-}
-
 bool openxr_init() {
 	vector<const char*> use_extensions;
 	const char *ask_extensions[] = { 
