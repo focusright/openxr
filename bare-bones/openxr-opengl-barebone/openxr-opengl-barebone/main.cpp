@@ -731,32 +731,6 @@ namespace Side {
     const int COUNT = 2;
 }
 
-namespace Math {
-    namespace Pose {
-        XrPosef Identity() {
-            XrPosef t{};
-            t.orientation.w = 1;
-            return t;
-        }
-
-        XrPosef Translation(const XrVector3f& translation) {
-            XrPosef t = Identity();
-            t.position = translation;
-            return t;
-        }
-
-        XrPosef RotateCCWAboutYAxis(float radians, XrVector3f translation) {
-            XrPosef t = Identity();
-            t.orientation.x = 0.f;
-            t.orientation.y = std::sin(radians * 0.5f);
-            t.orientation.z = 0.f;
-            t.orientation.w = std::cos(radians * 0.5f);
-            t.position = translation;
-            return t;
-        }
-    }
-}
-
 inline bool EqualsIgnoreCase(const std::string& s1, const std::string& s2, const std::locale& loc = std::locale()) {
     const std::ctype<char>& ctype = std::use_facet<std::ctype<char>>(loc);
     const auto compareCharLower = [&](char c1, char c2) { return ctype.tolower(c1) == ctype.tolower(c2); };
@@ -765,7 +739,7 @@ inline bool EqualsIgnoreCase(const std::string& s1, const std::string& s2, const
 
 bool openxr_init() {
 	vector<const char*> use_extensions;
-	const char         *ask_extensions[] = { 
+	const char *ask_extensions[] = { 
 		XR_KHR_OPENGL_ENABLE_EXTENSION_NAME,
 		XR_EXT_DEBUG_UTILS_EXTENSION_NAME,
 	};
@@ -851,8 +825,6 @@ bool openxr_init() {
 		return false;
 
     XrReferenceSpaceCreateInfo referenceSpaceCreateInfo{XR_TYPE_REFERENCE_SPACE_CREATE_INFO};
-    referenceSpaceCreateInfo.poseInReferenceSpace = Math::Pose::Identity();
-    referenceSpaceCreateInfo.poseInReferenceSpace = Math::Pose::RotateCCWAboutYAxis(0.f, {-.3f, 1.5f, -1.f});
     referenceSpaceCreateInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
     XrSpace space;
     XrResult res = xrCreateReferenceSpace(xr_session, &referenceSpaceCreateInfo, &space);
@@ -865,7 +837,7 @@ bool openxr_init() {
 	uint32_t view_count = 0;
 	xrEnumerateViewConfigurationViews(xr_instance, xr_system_id, app_config_view, 0, &view_count, nullptr);
 	xr_config_views.resize(view_count, { XR_TYPE_VIEW_CONFIGURATION_VIEW });
-	xr_views       .resize(view_count, { XR_TYPE_VIEW });
+	xr_views.resize(view_count, { XR_TYPE_VIEW });
 	xrEnumerateViewConfigurationViews(xr_instance, xr_system_id, app_config_view, view_count, &view_count, xr_config_views.data());
 
 	for (uint32_t i = 0; i < view_count; i++) {
