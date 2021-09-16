@@ -31,8 +31,8 @@ HDC hDC;
 HGLRC hGLRC;
 HINSTANCE hInstance;
 HWND hWnd;
-int windowWidth;
-int windowHeight;
+int windowWidth = 640;
+int windowHeight = 480;
 
 PFNGLATTACHSHADERPROC             glAttachShader            ;
 PFNGLBLITFRAMEBUFFERPROC          glBlitFramebuffer         ;
@@ -99,15 +99,7 @@ LRESULT APIENTRY WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
     return DefWindowProcA(hWnd, message, wParam, lParam);
 }
 
-void DestroyWindow() {
-    wglMakeCurrent(NULL, NULL);
-    wglDeleteContext(hGLRC);
-    ReleaseDC(hWnd, hDC);
-    DestroyWindow(hWnd);
-    UnregisterClassA(APPLICATION_NAME, hInstance);
-}
-
-void ksGpuContext_CreateForSurface() {
+void create_app_context() {
     PIXELFORMATDESCRIPTOR pfd = { sizeof(PIXELFORMATDESCRIPTOR), 1, PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,  PFD_TYPE_RGBA, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, PFD_MAIN_PLANE, 0, 0, 0, 0 };
     int pixelFormat = ChoosePixelFormat(hDC, &pfd);
     SetPixelFormat(hDC, pixelFormat, &pfd);
@@ -122,9 +114,7 @@ void ksGpuContext_CreateForSurface() {
     GlInitExtensions();
 }
 
-void ksGpuWindow_Create(int width, int height) {
-    windowWidth = width;
-    windowHeight = height;
+void create_app_window() {
     DEVMODEA lpDevMode;
     memset(&lpDevMode, 0, sizeof(DEVMODEA));
     lpDevMode.dmSize = sizeof(DEVMODEA);
@@ -147,9 +137,9 @@ void ksGpuWindow_Create(int width, int height) {
 
     RECT windowRect;
     windowRect.left = (long)0;
-    windowRect.right = (long)width;
+    windowRect.right = (long)windowWidth;
     windowRect.top = (long)0;
-    windowRect.bottom = (long)height;
+    windowRect.bottom = (long)windowHeight;
 
     AdjustWindowRectEx(&windowRect, dwStyle, FALSE, dwExStyle);
 
@@ -170,20 +160,21 @@ void ksGpuWindow_Create(int width, int height) {
                                    windowRect.right - windowRect.left,
                                    windowRect.bottom - windowRect.top,
                                    NULL, NULL, hInstance, NULL);
-
-    //SetWindowLongPtrA(hWnd, GWLP_USERDATA, (LONG_PTR)window);
-
     hDC = GetDC(hWnd);
-
-    ksGpuContext_CreateForSurface();
-
+    create_app_context();
     wglMakeCurrent(hDC, hGLRC);
-
     ShowWindow(hWnd, SW_SHOW);
     SetForegroundWindow(hWnd);
     SetFocus(hWnd);
 }
 
+void destroy_app_window() {
+    wglMakeCurrent(NULL, NULL);
+    wglDeleteContext(hGLRC);
+    ReleaseDC(hWnd, hDC);
+    DestroyWindow(hWnd);
+    UnregisterClassA(APPLICATION_NAME, hInstance);
+}
 
 void device_init();
 void opengl_render_layer(const XrCompositionLayerProjectionView& layerView, const XrSwapchainImageOpenGLKHR* swapchainImage, int index);
@@ -193,18 +184,6 @@ struct swapchain_t {
 	int32_t width;
 	int32_t height;
 	vector<XrSwapchainImageOpenGLKHR> surface_images;
-};
-
-struct input_state_t {
-	XrActionSet actionSet;
-	XrAction    poseAction;
-	XrAction    selectAction;
-	XrPath   handSubactionPath[2];
-	XrSpace  handSpace[2];
-	XrPosef  handPose[2];
-	XrBool32 renderHand[2];
-	XrBool32 handSelect[2];
-    std::array<XrBool32, 2> handActive;
 };
 
 PFN_xrGetOpenGLGraphicsRequirementsKHR ext_xrGetOpenGLGraphicsRequirementsKHR = nullptr;
@@ -221,7 +200,6 @@ XrSessionState xr_session_state = XR_SESSION_STATE_UNKNOWN;
 bool           xr_running       = false;
 XrSpace        xr_app_space     = {};
 XrSystemId     xr_system_id     = XR_NULL_SYSTEM_ID;
-input_state_t  xr_input         = { };
 XrEnvironmentBlendMode   xr_blend = {};
 XrDebugUtilsMessengerEXT xr_debug = {};
 XrSpaceLocation xr_fixed_space = {};
@@ -237,12 +215,6 @@ namespace Side {
     const int LEFT = 0;
     const int RIGHT = 1;
     const int COUNT = 2;
-}
-
-inline bool EqualsIgnoreCase(const std::string& s1, const std::string& s2, const std::locale& loc = std::locale()) {
-    const std::ctype<char>& ctype = std::use_facet<std::ctype<char>>(loc);
-    const auto compareCharLower = [&](char c1, char c2) { return ctype.tolower(c1) == ctype.tolower(c2); };
-    return s1.size() == s2.size() && std::equal(s1.begin(), s1.end(), s2.begin(), compareCharLower);
 }
 
 bool openxr_init() {
@@ -329,8 +301,8 @@ bool openxr_init() {
 	sessionInfo.systemId = xr_system_id;
 	xrCreateSession(xr_instance, &sessionInfo, &xr_session);
 
-	if (xr_session == nullptr)
-		return false;
+	if (xr_session == nullptr) { return false; }
+		
 
     XrReferenceSpaceCreateInfo referenceSpaceCreateInfo{XR_TYPE_REFERENCE_SPACE_CREATE_INFO};
     referenceSpaceCreateInfo.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
@@ -476,7 +448,7 @@ void openxr_shutdown() {
     xrDestroySession(xr_session);
     ext_xrDestroyDebugUtilsMessengerEXT(xr_debug);
     xrDestroyInstance(xr_instance);
-    DestroyWindow();
+    destroy_app_window();
 }
 
 
@@ -486,7 +458,7 @@ void device_init() {
     xrGetInstanceProcAddr(xr_instance, "xrGetOpenGLGraphicsRequirementsKHR", reinterpret_cast<PFN_xrVoidFunction*>(&pfnGetOpenGLGraphicsRequirementsKHR));
     XrGraphicsRequirementsOpenGLKHR graphicsRequirements{XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_KHR};
     pfnGetOpenGLGraphicsRequirementsKHR(xr_instance, xr_system_id, &graphicsRequirements);
-    ksGpuWindow_Create(640, 480);
+    create_app_window();
     m_graphicsBinding.hDC = hDC;
     m_graphicsBinding.hGLRC = hGLRC;
 }
@@ -776,8 +748,8 @@ void opengl_shutdown() {
 }
 
 int main(int argc, char* argv[]) {
-    openxr_init();
-	opengl_init();
+    if (!openxr_init()) { return 1; }
+    opengl_init();
 
     static bool quit = false;
 	while (!quit) {
