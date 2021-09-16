@@ -178,9 +178,6 @@ struct swapchain_t {
 };
 
 PFN_xrGetOpenGLGraphicsRequirementsKHR ext_xrGetOpenGLGraphicsRequirementsKHR = nullptr;
-PFN_xrCreateDebugUtilsMessengerEXT     ext_xrCreateDebugUtilsMessengerEXT     = nullptr;
-PFN_xrDestroyDebugUtilsMessengerEXT    ext_xrDestroyDebugUtilsMessengerEXT    = nullptr;
-
 XrFormFactor app_config_form = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
 XrViewConfigurationType app_config_view = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
 XrGraphicsBindingOpenGLWin32KHR xr_graphicsBinding{XR_TYPE_GRAPHICS_BINDING_OPENGL_WIN32_KHR};
@@ -200,10 +197,7 @@ vector<swapchain_t> xr_swapchains;
 
 bool openxr_init() {
 	vector<const char*> use_extensions;
-	const char *ask_extensions[] = { 
-		XR_KHR_OPENGL_ENABLE_EXTENSION_NAME,
-		XR_EXT_DEBUG_UTILS_EXTENSION_NAME,
-	};
+	const char *ask_extension = XR_KHR_OPENGL_ENABLE_EXTENSION_NAME;
 
 	uint32_t ext_count = 0;
 	xrEnumerateInstanceExtensionProperties(nullptr, 0, &ext_count, nullptr);
@@ -213,12 +207,8 @@ bool openxr_init() {
 	printf("OpenXR extensions available:\n");
 	for (size_t i = 0; i < xr_exts.size(); i++) {
 		printf("- %s\n", xr_exts[i].extensionName);
-
-		for (int32_t ask = 0; ask < _countof(ask_extensions); ask++) {
-			if (strcmp(ask_extensions[ask], xr_exts[i].extensionName) == 0) {
-				use_extensions.push_back(ask_extensions[ask]);
-				break;
-			}
+		if (strcmp(ask_extension, xr_exts[i].extensionName) == 0) {
+			use_extensions.push_back(ask_extension);
 		}
 	}
 
@@ -235,32 +225,7 @@ bool openxr_init() {
 
     if (xr_instance == nullptr) { return false; }
 
-	xrGetInstanceProcAddr(xr_instance, "xrCreateDebugUtilsMessengerEXT",     (PFN_xrVoidFunction *)(&ext_xrCreateDebugUtilsMessengerEXT   ));
-	xrGetInstanceProcAddr(xr_instance, "xrDestroyDebugUtilsMessengerEXT",    (PFN_xrVoidFunction *)(&ext_xrDestroyDebugUtilsMessengerEXT  ));
 	xrGetInstanceProcAddr(xr_instance, "xrGetOpenGLGraphicsRequirementsKHR", (PFN_xrVoidFunction *)(&ext_xrGetOpenGLGraphicsRequirementsKHR));
-
-	XrDebugUtilsMessengerCreateInfoEXT debug_info = { XR_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT };
-	debug_info.messageTypes =
-		XR_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT     |
-		XR_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT  |
-		XR_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT |
-		XR_DEBUG_UTILS_MESSAGE_TYPE_CONFORMANCE_BIT_EXT;
-	debug_info.messageSeverities =
-		XR_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
-		XR_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT    |
-		XR_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
-		XR_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-	debug_info.userCallback = [](XrDebugUtilsMessageSeverityFlagsEXT severity, XrDebugUtilsMessageTypeFlagsEXT types, const XrDebugUtilsMessengerCallbackDataEXT *msg, void* user_data) {
-		printf("%s: %s\n", msg->functionName, msg->message);
-		char text[512];
-		sprintf_s(text, "%s: %s", msg->functionName, msg->message);
-		OutputDebugStringA(text);
-
-		return (XrBool32)XR_FALSE;
-	};
-
-	if (ext_xrCreateDebugUtilsMessengerEXT)
-		ext_xrCreateDebugUtilsMessengerEXT(xr_instance, &debug_info, &xr_debug);
 	
 	XrSystemGetInfo systemInfo = { XR_TYPE_SYSTEM_GET_INFO };
 	systemInfo.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
@@ -423,7 +388,6 @@ void openxr_shutdown() {
 	xr_swapchains.clear();
     xrDestroySpace(xr_app_space);
     xrDestroySession(xr_session);
-    ext_xrDestroyDebugUtilsMessengerEXT(xr_debug);
     xrDestroyInstance(xr_instance);
     destroy_app_window();
 }
