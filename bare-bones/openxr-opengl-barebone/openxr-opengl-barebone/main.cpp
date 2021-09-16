@@ -197,10 +197,7 @@ vector<swapchain_t> xr_swapchains;
 
 bool openxr_init() {
 	vector<const char*> use_extensions;
-	const char *ask_extensions[] = { 
-		XR_KHR_OPENGL_ENABLE_EXTENSION_NAME,
-		XR_EXT_DEBUG_UTILS_EXTENSION_NAME,
-	};
+	const char *ask_extension = XR_KHR_OPENGL_ENABLE_EXTENSION_NAME;
 
 	uint32_t ext_count = 0;
 	xrEnumerateInstanceExtensionProperties(nullptr, 0, &ext_count, nullptr);
@@ -210,11 +207,8 @@ bool openxr_init() {
 	printf("OpenXR extensions available:\n");
 	for (size_t i = 0; i < xr_exts.size(); i++) {
 		printf("- %s\n", xr_exts[i].extensionName);
-		for (int32_t ask = 0; ask < _countof(ask_extensions); ask++) {
-			if (strcmp(ask_extensions[ask], xr_exts[i].extensionName) == 0) {
-				use_extensions.push_back(ask_extensions[ask]);
-				break;
-			}
+		if (strcmp(ask_extension, xr_exts[i].extensionName) == 0) {
+			use_extensions.push_back(ask_extension);
 		}
 	}
 
@@ -223,8 +217,8 @@ bool openxr_init() {
 	})) { return false; }
 
 	XrInstanceCreateInfo createInfo = { XR_TYPE_INSTANCE_CREATE_INFO };
-	createInfo.enabledExtensionCount      = use_extensions.size();
-	createInfo.enabledExtensionNames      = use_extensions.data();
+	createInfo.enabledExtensionCount = use_extensions.size();
+	createInfo.enabledExtensionNames = use_extensions.data();
 	createInfo.applicationInfo.apiVersion = XR_CURRENT_API_VERSION;
 	strcpy_s(createInfo.applicationInfo.applicationName, "bare bone");
 	xrCreateInstance(&createInfo, &xr_instance);
