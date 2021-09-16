@@ -528,11 +528,9 @@ void ksGpuWindow_Destroy(ksGpuWindow *window) {
     }
 }
 
-static bool ksGpuContext_CreateForSurface(ksGpuContext *context, const ksGpuDevice *device, const int queueIndex,
+static bool ksGpuContext_CreateForSurface(ksGpuContext *context, const ksGpuDevice *device,
                                           const ksGpuSurfaceColorFormat colorFormat, const ksGpuSurfaceDepthFormat depthFormat,
                                           const ksGpuSampleCount sampleCount, HINSTANCE hInstance, HDC hDC) {
-    UNUSED_PARM(queueIndex);
-
     context->device = device;
 
     const ksGpuSurfaceBits bits = ksGpuContext_BitsForSurfaceFormat(colorFormat, depthFormat);
@@ -663,9 +661,14 @@ static bool ksGpuContext_CreateForSurface(ksGpuContext *context, const ksGpuDevi
     return true;
 }
 
-bool ksGpuWindow_Create(ksGpuWindow *window, ksDriverInstance *instance, const ksGpuQueueInfo *queueInfo, int queueIndex,
-                        ksGpuSurfaceColorFormat colorFormat, ksGpuSurfaceDepthFormat depthFormat, ksGpuSampleCount sampleCount,
-                        int width, int height, bool fullscreen) {
+bool ksGpuWindow_Create(ksGpuWindow *window, int width, int height, bool fullscreen) {
+
+    ksDriverInstance driverInstance{};
+    ksGpuQueueInfo queueInfo{};
+    ksGpuSurfaceColorFormat colorFormat{KS_GPU_SURFACE_COLOR_FORMAT_B8G8R8A8};
+    ksGpuSurfaceDepthFormat depthFormat{KS_GPU_SURFACE_DEPTH_FORMAT_D24};
+    ksGpuSampleCount sampleCount{KS_GPU_SAMPLE_COUNT_1};
+
     memset(window, 0, sizeof(ksGpuWindow));
 
     window->colorFormat = colorFormat;
@@ -787,8 +790,8 @@ bool ksGpuWindow_Create(ksGpuWindow *window, ksDriverInstance *instance, const k
         return false;
     }
 
-    ksGpuDevice_Create(&window->device, instance, queueInfo);
-    ksGpuContext_CreateForSurface(&window->context, &window->device, queueIndex, colorFormat, depthFormat, sampleCount,
+    ksGpuDevice_Create(&window->device, &driverInstance, &queueInfo);
+    ksGpuContext_CreateForSurface(&window->context, &window->device, colorFormat, depthFormat, sampleCount,
                                   window->hInstance, window->hDC);
     ksGpuContext_SetCurrent(&window->context);
 
@@ -1207,28 +1210,12 @@ void device_init() {
         XrGraphicsRequirementsOpenGLKHR graphicsRequirements{XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_KHR};
         pfnGetOpenGLGraphicsRequirementsKHR(xr_instance, xr_system_id, &graphicsRequirements);
 
-        ksDriverInstance driverInstance{};
-        ksGpuQueueInfo queueInfo{};
-        ksGpuSurfaceColorFormat colorFormat{KS_GPU_SURFACE_COLOR_FORMAT_B8G8R8A8};
-        ksGpuSurfaceDepthFormat depthFormat{KS_GPU_SURFACE_DEPTH_FORMAT_D24};
-        ksGpuSampleCount sampleCount{KS_GPU_SAMPLE_COUNT_1};
-        if (!ksGpuWindow_Create(&window, &driverInstance, &queueInfo, 0, colorFormat, depthFormat, sampleCount, 640, 480, false)) {
+        if (!ksGpuWindow_Create(&window, 640, 480, false)) {
             throw std::logic_error("Unable to create GL context");
-        }
-
-        GLint major = 0;
-        GLint minor = 0;
-        glGetIntegerv(GL_MAJOR_VERSION, &major);
-        glGetIntegerv(GL_MINOR_VERSION, &minor);
-
-        const XrVersion desiredApiVersion = XR_MAKE_VERSION(major, minor, 0);
-        if (graphicsRequirements.minApiVersionSupported > desiredApiVersion) {
-            throw std::logic_error("Runtime does not support desired Graphics API and/or version");
         }
 
         m_graphicsBinding.hDC = window.context.hDC;
         m_graphicsBinding.hGLRC = window.context.hGLRC;
-        glEnable(GL_DEBUG_OUTPUT); //may need to import code for gl debugging
 }
 
 
