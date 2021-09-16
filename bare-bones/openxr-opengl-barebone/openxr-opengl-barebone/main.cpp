@@ -400,12 +400,6 @@ static void Error(const char *format, ...) {
     OutputDebugStringA(buffer);
 }
 
-void GlBootstrapExtensions() {
-    wglChoosePixelFormatARB = (PFNWGLCHOOSEPIXELFORMATARBPROC)GetExtension("wglChoosePixelFormatARB");
-    wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC)GetExtension("wglCreateContextAttribsARB");
-    wglSwapIntervalEXT = (PFNWGLSWAPINTERVALEXTPROC)GetExtension("wglSwapIntervalEXT");
-    wglDelayBeforeSwapNV = (PFNWGLDELAYBEFORESWAPNVPROC)GetExtension("wglDelayBeforeSwapNV");
-}
 
 
 
@@ -474,87 +468,20 @@ void ksGpuWindow_Destroy(ksGpuWindow *window) {
 
 
 
-static bool ksGpuContext_CreateForSurface(ksGpuContext *context, const ksGpuDevice *device, const ksGpuSampleCount sampleCount, HINSTANCE hInstance, HDC hDC) {
-    context->device = device;
-
-    PIXELFORMATDESCRIPTOR pfd = { sizeof(PIXELFORMATDESCRIPTOR), 1, PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,  PFD_TYPE_RGBA, 
-        32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, PFD_MAIN_PLANE, 0, 0, 0, 0 };
-
-    HWND localWnd = NULL;
-    HDC localDC = hDC;
-
-    int pixelFormat = ChoosePixelFormat(localDC, &pfd);
-    SetPixelFormat(localDC, pixelFormat, &pfd);
-    HGLRC hGLRC = wglCreateContext(localDC);
-    wglMakeCurrent(localDC, hGLRC);
-    GlBootstrapExtensions();
+static bool ksGpuContext_CreateForSurface(ksGpuContext *context, HDC hDC) {
+    PIXELFORMATDESCRIPTOR pfd = { sizeof(PIXELFORMATDESCRIPTOR), 1, PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,  PFD_TYPE_RGBA, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 24, 0, 0, PFD_MAIN_PLANE, 0, 0, 0, 0 };
+    int pixelFormat = ChoosePixelFormat(hDC, &pfd);
+    SetPixelFormat(hDC, pixelFormat, &pfd);
+    HGLRC hGLRC = wglCreateContext(hDC);
+    wglMakeCurrent(hDC, hGLRC);
+    wglCreateContextAttribsARB = (PFNWGLCREATECONTEXTATTRIBSARBPROC)GetExtension("wglCreateContextAttribsARB");
     wglMakeCurrent(NULL, NULL);
     wglDeleteContext(hGLRC);
-
-
-    if (sampleCount > KS_GPU_SAMPLE_COUNT_1) {
-        ReleaseDC(localWnd, localDC);
-        DestroyWindow(localWnd);
-
-        int pixelFormatAttribs[] = {WGL_DRAW_TO_WINDOW_ARB,
-                                    GL_TRUE,
-                                    WGL_SUPPORT_OPENGL_ARB,
-                                    GL_TRUE,
-                                    WGL_DOUBLE_BUFFER_ARB,
-                                    GL_TRUE,
-                                    WGL_PIXEL_TYPE_ARB,
-                                    WGL_TYPE_RGBA_ARB,
-                                    WGL_COLOR_BITS_ARB,
-                                    32,
-                                    WGL_DEPTH_BITS_ARB,
-                                    24,
-                                    WGL_SAMPLE_BUFFERS_ARB,
-                                    1,
-                                    WGL_SAMPLES_ARB,
-                                    sampleCount,
-                                    0};
-
-        unsigned int numPixelFormats = 0;
-
-        if (!wglChoosePixelFormatARB(hDC, pixelFormatAttribs, NULL, 1, &pixelFormat, &numPixelFormats) || numPixelFormats == 0) {
-            Error("Failed to find MSAA pixel format.");
-            return false;
-        }
-
-        memset(&pfd, 0, sizeof(pfd));
-
-        if (!DescribePixelFormat(hDC, pixelFormat, sizeof(PIXELFORMATDESCRIPTOR), &pfd)) {
-            Error("Failed to describe the pixel format.");
-            return false;
-        }
-
-        if (!SetPixelFormat(hDC, pixelFormat, &pfd)) {
-            Error("Failed to set the pixel format.");
-            return false;
-        }
-    }
-
-    int contextAttribs[] = {WGL_CONTEXT_MAJOR_VERSION_ARB,
-                            OPENGL_VERSION_MAJOR,
-                            WGL_CONTEXT_MINOR_VERSION_ARB,
-                            OPENGL_VERSION_MINOR,
-                            WGL_CONTEXT_PROFILE_MASK_ARB,
-                            WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
-                            WGL_CONTEXT_FLAGS_ARB,
-                            WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB | WGL_CONTEXT_DEBUG_BIT_ARB,
-                            0};
-
+    int contextAttribs[] = {WGL_CONTEXT_MAJOR_VERSION_ARB, OPENGL_VERSION_MAJOR, WGL_CONTEXT_MINOR_VERSION_ARB, OPENGL_VERSION_MINOR, WGL_CONTEXT_PROFILE_MASK_ARB, WGL_CONTEXT_CORE_PROFILE_BIT_ARB, WGL_CONTEXT_FLAGS_ARB, WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB | WGL_CONTEXT_DEBUG_BIT_ARB, 0};
     context->hDC = hDC;
     context->hGLRC = wglCreateContextAttribsARB(hDC, NULL, contextAttribs);
-    if (!context->hGLRC) {
-        Error("Failed to create GL context.");
-        return false;
-    }
-
     wglMakeCurrent(hDC, context->hGLRC);
-
     GlInitExtensions();
-
     return true;
 }
 
@@ -684,7 +611,7 @@ bool ksGpuWindow_Create(ksGpuWindow *window, int width, int height, bool fullscr
 
     ksGpuDevice_Create(&window->device, &driverInstance, &queueInfo);
 
-    ksGpuContext_CreateForSurface(&window->context, &window->device, sampleCount, window->hInstance, window->hDC);
+    ksGpuContext_CreateForSurface(&window->context, window->hDC);
 
     ksGpuContext_SetCurrent(&window->context);
 
