@@ -1025,30 +1025,25 @@ namespace Geometry {
         XrVector3f Color;
     };
 
-    constexpr XrVector3f Black{0, 0, 0};
-    constexpr XrVector3f White{1, 1, 1};
-    constexpr XrVector3f Grey{.5f, .5f, .5f};
-    constexpr XrVector3f Red{1, 0, 0};
-    constexpr XrVector3f MidRed{0.5f, 0, 0};
-    constexpr XrVector3f DarkRed{0.25f, 0, 0};
-    constexpr XrVector3f Green{0, 1, 0};
-    constexpr XrVector3f MidGreen{0, 0.5f, 0};
-    constexpr XrVector3f DarkGreen{0, 0.25f, 0};
-    constexpr XrVector3f Blue{0, 0, 1};
-    constexpr XrVector3f MidBlue{0, 0, 0.5f};
-    constexpr XrVector3f DarkBlue{0, 0, 0.25f};
-    constexpr XrVector3f Yellow{1.f, 1.f, 0.f};
-    constexpr XrVector3f Cyan{0.f, 1.f, 1.f};
-    constexpr XrVector3f Purple{1.f, 0.f, 1.f};
+    XrVector3f Red{1, 0, 0};
+    XrVector3f DarkRed{0.25f, 0, 0};
+    XrVector3f Green{0, 1, 0};
+    XrVector3f MidGreen{0, 0.5f, 0};
+    XrVector3f DarkGreen{0, 0.25f, 0};
+    XrVector3f Blue{0, 0, 1};
+    XrVector3f DarkBlue{0, 0, 0.25f};
+    XrVector3f Yellow{1.f, 1.f, 0.f};
+    XrVector3f Cyan{0.f, 1.f, 1.f};
+    XrVector3f Purple{1.f, 0.f, 1.f};
 
-    constexpr XrVector3f LBB{-0.5f, -0.5f, -0.5f};
-    constexpr XrVector3f LBF{-0.5f, -0.5f, 0.5f};
-    constexpr XrVector3f LTB{-0.5f, 0.5f, -0.5f};
-    constexpr XrVector3f LTF{-0.5f, 0.5f, 0.5f};
-    constexpr XrVector3f RBB{0.5f, -0.5f, -0.5f};
-    constexpr XrVector3f RBF{0.5f, -0.5f, 0.5f};
-    constexpr XrVector3f RTB{0.5f, 0.5f, -0.5f};
-    constexpr XrVector3f RTF{0.5f, 0.5f, 0.5f};
+    XrVector3f LBB{-0.5f, -0.5f, -0.5f};
+    XrVector3f LBF{-0.5f, -0.5f, 0.5f};
+    XrVector3f LTB{-0.5f, 0.5f, -0.5f};
+    XrVector3f LTF{-0.5f, 0.5f, 0.5f};
+    XrVector3f RBB{0.5f, -0.5f, -0.5f};
+    XrVector3f RBF{0.5f, -0.5f, 0.5f};
+    XrVector3f RTB{0.5f, 0.5f, -0.5f};
+    XrVector3f RTF{0.5f, 0.5f, 0.5f};
 
     Vertex c_cubeVertices[] = {
         {LTB, DarkRed}, {LBF, DarkRed}, {LBB, DarkRed}, {LTB, DarkRed}, {LTF, DarkRed}, {LBF, DarkRed},
