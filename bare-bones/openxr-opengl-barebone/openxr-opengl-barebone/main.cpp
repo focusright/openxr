@@ -1,6 +1,3 @@
-#pragma comment( lib, "OpenGL32.lib" )
-
-#define no_init_all
 #define XR_USE_PLATFORM_WIN32
 #define XR_USE_GRAPHICS_API_OPENGL
 #define OPENGL_VERSION_MAJOR 4
@@ -28,8 +25,8 @@ HDC hDC;
 HGLRC hGLRC;
 HINSTANCE hInstance;
 HWND hWnd;
-int windowWidth = 640;
-int windowHeight = 480;
+const int windowWidth = 640;
+const int windowHeight = 480;
 
 PFNGLATTACHSHADERPROC             glAttachShader            ;
 PFNGLBLITFRAMEBUFFERPROC          glBlitFramebuffer         ;
@@ -422,25 +419,8 @@ namespace Geometry {
         XrVector3f Color;
     };
 
-    XrVector3f Red{1, 0, 0};
-    XrVector3f DarkRed{0.25f, 0, 0};
-    XrVector3f Green{0, 1, 0};
-    XrVector3f MidGreen{0, 0.5f, 0};
-    XrVector3f DarkGreen{0, 0.25f, 0};
-    XrVector3f Blue{0, 0, 1};
-    XrVector3f DarkBlue{0, 0, 0.25f};
-    XrVector3f Yellow{1.f, 1.f, 0.f};
-    XrVector3f Cyan{0.f, 1.f, 1.f};
-    XrVector3f Purple{1.f, 0.f, 1.f};
-
-    XrVector3f LBB{-0.5f, -0.5f, -0.5f};
-    XrVector3f LBF{-0.5f, -0.5f, 0.5f};
-    XrVector3f LTB{-0.5f, 0.5f, -0.5f};
-    XrVector3f LTF{-0.5f, 0.5f, 0.5f};
-    XrVector3f RBB{0.5f, -0.5f, -0.5f};
-    XrVector3f RBF{0.5f, -0.5f, 0.5f};
-    XrVector3f RTB{0.5f, 0.5f, -0.5f};
-    XrVector3f RTF{0.5f, 0.5f, 0.5f};
+    XrVector3f Red{ 1, 0, 0 }, DarkRed{ 0.25f, 0, 0 }, Green{ 0, 1, 0 }, MidGreen{ 0, 0.5f, 0 }, DarkGreen{ 0, 0.25f, 0 }, Blue{ 0, 0, 1 }, DarkBlue{ 0, 0, 0.25f }, Yellow{ 1.f, 1.f, 0.f }, Cyan{ 0.f, 1.f, 1.f }, Purple{ 1.f, 0.f, 1.f };
+    XrVector3f LBB{-0.5f, -0.5f, -0.5f}, LBF{-0.5f, -0.5f, 0.5f}, LTB{-0.5f, 0.5f, -0.5f}, LTF{-0.5f, 0.5f, 0.5f}, RBB{0.5f, -0.5f, -0.5f}, RBF{0.5f, -0.5f, 0.5f}, RTB{0.5f, 0.5f, -0.5f}, RTF{0.5f, 0.5f, 0.5f};
 
     Vertex c_cubeVertices[] = {
         {LTB, DarkRed}, {LBF, DarkRed}, {LBB, DarkRed}, {LTB, DarkRed}, {LTF, DarkRed}, {LBF, DarkRed},

@@ -99,7 +99,7 @@
       <SubSystem>NotSet</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(SolutionDir)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>openxr_loader.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>openxr_loader.lib;opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>xcopy /y /d  "$(SolutionDir)lib\*.dll" "$(OutDir)"</Command>
@@ -120,7 +120,7 @@
       <SubSystem>NotSet</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(SolutionDir)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>openxr_loader.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>openxr_loader.lib;opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>xcopy /y /d  "$(SolutionDir)lib\*.dll" "$(OutDir)"</Command>
@@ -145,7 +145,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(SolutionDir)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>openxr_loader.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>openxr_loader.lib;opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>xcopy /y /d  "$(SolutionDir)lib\*.dll" "$(OutDir)"</Command>
@@ -170,7 +170,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>$(SolutionDir)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>openxr_loader.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>openxr_loader.lib;opengl32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>xcopy /y /d  "$(SolutionDir)lib\*.dll" "$(OutDir)"</Command>
