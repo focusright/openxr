@@ -494,14 +494,15 @@ void opengl_init() {
         m_vertexAttribCoords = glGetAttribLocation(m_program, "VertexPos");
         m_vertexAttribColor  = glGetAttribLocation(m_program, "VertexColor");
 
+        glGenVertexArrays(1, &m_vertexArrayObject);
+        glBindVertexArray(m_vertexArrayObject);
+
         glGenBuffers(1, &m_planeVertexBuffer);
         glBindBuffer(GL_ARRAY_BUFFER, m_planeVertexBuffer);
         glBufferData(GL_ARRAY_BUFFER, sizeof(Geometry::c_planeVertices), Geometry::c_planeVertices, GL_STATIC_DRAW);
         glGenBuffers(1, &m_planeIndexBuffer);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_planeIndexBuffer);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(Geometry::c_planeIndices), Geometry::c_planeIndices, GL_STATIC_DRAW);
-        glGenVertexArrays(1, &m_vertexArrayObject);
-        glBindVertexArray(m_vertexArrayObject);
         glBindBuffer(GL_ARRAY_BUFFER, m_planeVertexBuffer);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_planeIndexBuffer);
 
