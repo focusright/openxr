@@ -476,26 +476,23 @@ void opengl_init() {
         GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
         glShaderSource(vertexShader, 1, &VertexShaderGlsl, nullptr);
         glCompileShader(vertexShader);
-
         GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
         glShaderSource(fragmentShader, 1, &FragmentShaderGlsl, nullptr);
         glCompileShader(fragmentShader);
-
         m_program = glCreateProgram();
         glAttachShader(m_program, vertexShader);
         glAttachShader(m_program, fragmentShader);
         glLinkProgram(m_program);
-
         glDeleteShader(vertexShader);
         glDeleteShader(fragmentShader);
 
         m_modelViewProjectionUniformLocation = glGetUniformLocation(m_program, "ModelViewProjection");
-
         m_vertexAttribCoords = glGetAttribLocation(m_program, "VertexPos");
         m_vertexAttribColor  = glGetAttribLocation(m_program, "VertexColor");
-
         glGenVertexArrays(1, &m_vertexArrayObject);
         glBindVertexArray(m_vertexArrayObject);
+        glEnableVertexAttribArray(m_vertexAttribCoords);
+        glEnableVertexAttribArray(m_vertexAttribColor);
 
         glGenBuffers(1, &m_planeVertexBuffer);
         glBindBuffer(GL_ARRAY_BUFFER, m_planeVertexBuffer);
@@ -505,9 +502,6 @@ void opengl_init() {
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(Geometry::c_planeIndices), Geometry::c_planeIndices, GL_STATIC_DRAW);
         glBindBuffer(GL_ARRAY_BUFFER, m_planeVertexBuffer);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_planeIndexBuffer);
-
-        glEnableVertexAttribArray(m_vertexAttribCoords);
-        glEnableVertexAttribArray(m_vertexAttribColor);
 
         glGenBuffers(1, &m_cubeVertexBuffer);
         glBindBuffer(GL_ARRAY_BUFFER, m_cubeVertexBuffer);
