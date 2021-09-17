@@ -210,7 +210,7 @@ bool openxr_init() {
 	}
 
 	if (!std::any_of( use_extensions.begin(), use_extensions.end(), [] (const char *ext) {
-        return strcmp(ext, XR_KHR_OPENGL_ENABLE_EXTENSION_NAME)==0;
+        return strcmp(ext, XR_KHR_OPENGL_ENABLE_EXTENSION_NAME) == 0;
 	})) { return false; }
 
 	XrInstanceCreateInfo createInfo = { XR_TYPE_INSTANCE_CREATE_INFO };
@@ -408,9 +408,7 @@ GLuint m_program{0};
 GLint m_modelViewProjectionUniformLocation{0};
 GLint m_vertexAttribCoords{0};
 GLint m_vertexAttribColor{0};
-GLuint m_vao_plane{0};
-GLuint m_vao_cube{0};
-GLuint m_vao_sphere{0};
+GLuint m_vertexArrayObject{0};
 GLuint m_cubeVertexBuffer{0};
 GLuint m_cubeIndexBuffer{0};
 GLuint m_planeVertexBuffer{0};
@@ -502,8 +500,8 @@ void opengl_init() {
         glGenBuffers(1, &m_planeIndexBuffer);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_planeIndexBuffer);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(Geometry::c_planeIndices), Geometry::c_planeIndices, GL_STATIC_DRAW);
-        glGenVertexArrays(1, &m_vao_plane);
-        glBindVertexArray(m_vao_plane);
+        glGenVertexArrays(1, &m_vertexArrayObject);
+        glBindVertexArray(m_vertexArrayObject);
         glBindBuffer(GL_ARRAY_BUFFER, m_planeVertexBuffer);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_planeIndexBuffer);
 
@@ -516,8 +514,6 @@ void opengl_init() {
         glGenBuffers(1, &m_cubeIndexBuffer);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_cubeIndexBuffer);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(Geometry::c_cubeIndices), Geometry::c_cubeIndices, GL_STATIC_DRAW);
-        glGenVertexArrays(1, &m_vao_cube);
-        glBindVertexArray(m_vao_cube);
         glBindBuffer(GL_ARRAY_BUFFER, m_cubeVertexBuffer);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_cubeIndexBuffer);
 
@@ -527,8 +523,6 @@ void opengl_init() {
         glGenBuffers(1, &m_sphereIndexBuffer);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_sphereIndexBuffer);
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(Geometry::c_sphereIndices), Geometry::c_sphereIndices, GL_STATIC_DRAW);
-        glGenVertexArrays(1, &m_vao_sphere);
-        glBindVertexArray(m_vao_sphere);
         glBindBuffer(GL_ARRAY_BUFFER, m_sphereVertexBuffer);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_sphereIndexBuffer);
 }
@@ -538,13 +532,11 @@ uint32_t GetDepthTexture(uint32_t colorTexture) {
     if (depthBufferIt != m_colorToDepthMap.end()) {
         return depthBufferIt->second;
     }
-
     GLint width;
     GLint height;
     glBindTexture(GL_TEXTURE_2D, colorTexture);
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &width);
     glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &height);
-
     uint32_t depthTexture;
     glGenTextures(1, &depthTexture);
     glBindTexture(GL_TEXTURE_2D, depthTexture);
@@ -553,9 +545,7 @@ uint32_t GetDepthTexture(uint32_t colorTexture) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-
     m_colorToDepthMap.insert(std::make_pair(colorTexture, depthTexture));
-
     return depthTexture;
 }
 
@@ -602,9 +592,7 @@ void opengl_render_layer(const XrCompositionLayerProjectionView& layerView, cons
         XrMatrix4x4f vp;
         XrMatrix4x4f_Multiply(&vp, &proj, &view);
 
-        glBindVertexArray(m_vao_sphere);
-        glBindVertexArray(m_vao_cube);
-        glBindVertexArray(m_vao_plane); //This order needs to be reversed for some reason
+        glBindVertexArray(m_vertexArrayObject);
 
         XrMatrix4x4f model;
         XrMatrix4x4f mvp;
@@ -651,26 +639,19 @@ void opengl_render_layer(const XrCompositionLayerProjectionView& layerView, cons
         int32_t height = layerView.subImage.imageRect.extent.height;
         
         glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-        if (index == 0) {
-            glBlitFramebuffer(0, 0, width, height, 0, 0, windowWidth/2, windowHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-        } else if (index == 1) {
-            glBlitFramebuffer(0, 0, width, height, windowWidth/2, 0, windowWidth, windowHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-        }
+             if (index == 0) { glBlitFramebuffer(0, 0, width, height, 0, 0, windowWidth/2, windowHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST); }
+        else if (index == 1) { glBlitFramebuffer(0, 0, width, height, windowWidth/2, 0, windowWidth, windowHeight, GL_COLOR_BUFFER_BIT, GL_NEAREST); }
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
         static int everyOther = 0;
-        if ((everyOther++ & 1) != 0) {
-            SwapBuffers(hDC);
-        }
+        if ((everyOther++ & 1) != 0) { SwapBuffers(hDC);}
 }
 
 void opengl_shutdown() {
     glDeleteFramebuffers(1, &m_swapchainFramebuffer);
     glDeleteProgram(m_program);
-    glDeleteVertexArrays(1, &m_vao_plane);
-    glDeleteVertexArrays(1, &m_vao_cube);
-    glDeleteVertexArrays(1, &m_vao_sphere);
+    glDeleteVertexArrays(1, &m_vertexArrayObject);
     glDeleteBuffers(1, &m_planeVertexBuffer);
     glDeleteBuffers(1, &m_planeIndexBuffer);
     glDeleteBuffers(1, &m_cubeVertexBuffer);
