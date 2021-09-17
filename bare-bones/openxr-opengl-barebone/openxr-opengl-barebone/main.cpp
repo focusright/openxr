@@ -180,17 +180,17 @@ struct swapchain_t {
 PFN_xrGetOpenGLGraphicsRequirementsKHR ext_xrGetOpenGLGraphicsRequirementsKHR = nullptr;
 XrViewConfigurationType app_config_view = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
 XrGraphicsBindingOpenGLWin32KHR xr_graphicsBinding{XR_TYPE_GRAPHICS_BINDING_OPENGL_WIN32_KHR};
+XrSessionState xr_session_state = XR_SESSION_STATE_UNKNOWN;
+XrSystemId xr_system_id = XR_NULL_SYSTEM_ID;
 const XrPosef xr_pose_identity = { {0,0,0,1}, {0,0,0} };
 XrInstance xr_instance = {};
 XrSession xr_session = {};
-XrSessionState xr_session_state = XR_SESSION_STATE_UNKNOWN;
-bool xr_running = false;
 XrSpace xr_app_space = {};
-XrSystemId xr_system_id = XR_NULL_SYSTEM_ID;
 XrEnvironmentBlendMode xr_blend = {};
 vector<XrView> xr_views;
 vector<XrViewConfigurationView> xr_config_views;
 vector<swapchain_t> xr_swapchains;
+bool xr_running = false;
 
 bool openxr_init() {
 	vector<const char*> use_extensions;
@@ -217,7 +217,7 @@ bool openxr_init() {
 	createInfo.enabledExtensionCount = use_extensions.size();
 	createInfo.enabledExtensionNames = use_extensions.data();
 	createInfo.applicationInfo.apiVersion = XR_CURRENT_API_VERSION;
-	strcpy_s(createInfo.applicationInfo.applicationName, "bare bone");
+	strcpy_s(createInfo.applicationInfo.applicationName, "app");
 	xrCreateInstance(&createInfo, &xr_instance);
 
     if (xr_instance == nullptr) { return false; }
@@ -289,30 +289,29 @@ bool openxr_init() {
 }
 
 void openxr_poll_events(bool &exit) {
-	exit = false;
 	XrEventDataBuffer event_buffer = { XR_TYPE_EVENT_DATA_BUFFER };
 	while (xrPollEvent(xr_instance, &event_buffer) == XR_SUCCESS) {
 		switch (event_buffer.type) {
-		case XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED: {
-			XrEventDataSessionStateChanged *changed = (XrEventDataSessionStateChanged*)&event_buffer;
-			xr_session_state = changed->state;
+		    case XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED: {
+			    XrEventDataSessionStateChanged *changed = (XrEventDataSessionStateChanged*)&event_buffer;
+			    xr_session_state = changed->state;
 
-			switch (xr_session_state) {
-			    case XR_SESSION_STATE_READY: {
-				    XrSessionBeginInfo begin_info = { XR_TYPE_SESSION_BEGIN_INFO };
-				    begin_info.primaryViewConfigurationType = app_config_view;
-				    xrBeginSession(xr_session, &begin_info);
-				    xr_running = true;
-			    } break;
-			    case XR_SESSION_STATE_STOPPING: {
-				    xr_running = false;
-				    xrEndSession(xr_session); 
-			    } break;
-			    case XR_SESSION_STATE_EXITING:      exit = true; break;
-			    case XR_SESSION_STATE_LOSS_PENDING: exit = true; break;
-			}
-		} break;
-		case XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING: exit = true; return;
+			    switch (xr_session_state) {
+			        case XR_SESSION_STATE_READY: {
+				        XrSessionBeginInfo begin_info = { XR_TYPE_SESSION_BEGIN_INFO };
+				        begin_info.primaryViewConfigurationType = app_config_view;
+				        xrBeginSession(xr_session, &begin_info);
+				        xr_running = true;
+			        } break;
+			        case XR_SESSION_STATE_STOPPING: {
+				        xr_running = false;
+				        xrEndSession(xr_session); 
+			        } break;
+			        case XR_SESSION_STATE_EXITING:      exit = true; break;
+			        case XR_SESSION_STATE_LOSS_PENDING: exit = true; break;
+			    }
+		    } break;
+		    case XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING: exit = true; return;
 		}
 		event_buffer = { XR_TYPE_EVENT_DATA_BUFFER };
 	}
@@ -389,8 +388,6 @@ void openxr_shutdown() {
     destroy_app_window();
 }
 
-
-
 void device_init() {
     PFN_xrGetOpenGLGraphicsRequirementsKHR pfnGetOpenGLGraphicsRequirementsKHR = nullptr;
     xrGetInstanceProcAddr(xr_instance, "xrGetOpenGLGraphicsRequirementsKHR", reinterpret_cast<PFN_xrVoidFunction*>(&pfnGetOpenGLGraphicsRequirementsKHR));
@@ -400,8 +397,6 @@ void device_init() {
     xr_graphicsBinding.hDC = hDC;
     xr_graphicsBinding.hGLRC = hGLRC;
 }
-
-
 
 GLuint m_swapchainFramebuffer{0};
 GLuint m_program{0};
@@ -574,26 +569,19 @@ void opengl_render_layer(const XrCompositionLayerProjectionView& layerView, cons
         glUseProgram(m_program);
 
         const auto& pose = layerView.pose;
-        XrMatrix4x4f proj;
+        XrMatrix4x4f proj, view, vp, mvp, model, toView;
         XrMatrix4x4f_CreateProjectionFov(&proj, GRAPHICS_OPENGL, layerView.fov, 0.05f, 100.0f);
-        XrMatrix4x4f toView;
-        XrVector3f scale{1.f, 1.f, 1.f};
+        XrVector3f scale_one{1.f, 1.f, 1.f};
         XrVector3f zero_vector{ 0.f, 0.f, 0.f};
         XrQuaternionf zero_quaternion{ 0.f, 0.f, 0.f, 0.f};
 
-        XrMatrix4x4f_CreateTranslationRotationScale(&toView, &pose.position, &pose.orientation, &scale);
-        XrMatrix4x4f view;
+        XrMatrix4x4f_CreateTranslationRotationScale(&toView, &pose.position, &pose.orientation, &scale_one);
         XrMatrix4x4f_InvertRigidBody(&view, &toView);
-        XrMatrix4x4f vp;
         XrMatrix4x4f_Multiply(&vp, &proj, &view);
 
         glBindVertexArray(m_vertexArrayObject);
-
-        XrMatrix4x4f model;
-        XrMatrix4x4f mvp;
         
-        //plane
-        XrVector3f plane_scale{5.f, 5.f, 5.f};
+        XrVector3f plane_scale{5.f, 5.f, 5.f}; //plane
         XrVector3f plane_position{0.f, -4.f, 0.f};
         glBindBuffer(GL_ARRAY_BUFFER, m_planeVertexBuffer);
         glVertexAttribPointer(m_vertexAttribCoords, 3, GL_FLOAT, GL_FALSE, sizeof(Geometry::Vertex), nullptr);
@@ -604,8 +592,7 @@ void opengl_render_layer(const XrCompositionLayerProjectionView& layerView, cons
         glUniformMatrix4fv(m_modelViewProjectionUniformLocation, 1, GL_FALSE, reinterpret_cast<const GLfloat*>(&mvp));
         glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(ArraySize(Geometry::c_planeIndices)), GL_UNSIGNED_SHORT, nullptr);
 
-        //cube
-        XrVector3f cube_position{-.2f, 0.f, -1.f};
+        XrVector3f cube_position{-.2f, 0.f, -1.f}; //cube
         XrVector3f cube_scale{ .25f, .25f, .25f };
         glBindBuffer(GL_ARRAY_BUFFER, m_cubeVertexBuffer);
         glVertexAttribPointer(m_vertexAttribCoords, 3, GL_FLOAT, GL_FALSE, sizeof(Geometry::Vertex), nullptr);
@@ -616,8 +603,7 @@ void opengl_render_layer(const XrCompositionLayerProjectionView& layerView, cons
         glUniformMatrix4fv(m_modelViewProjectionUniformLocation, 1, GL_FALSE, reinterpret_cast<const GLfloat*>(&mvp));
         glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(ArraySize(Geometry::c_cubeIndices)), GL_UNSIGNED_SHORT, nullptr);
 
-        //sphere
-        XrVector3f sphere_scale{.25f, .25f, .25f};
+        XrVector3f sphere_scale{.25f, .25f, .25f}; //sphere
         XrVector3f sphere_position{.5f, 0.f, -1.f};
         glBindBuffer(GL_ARRAY_BUFFER, m_sphereVertexBuffer);
         glVertexAttribPointer(m_vertexAttribCoords, 3, GL_FLOAT, GL_FALSE, sizeof(Geometry::Vertex), nullptr);
