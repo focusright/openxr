@@ -3,7 +3,6 @@
 #define OPENGL_VERSION_MAJOR 4
 #define OPENGL_VERSION_MINOR 3
 #define GRAPHICS_API_OPENGL 1
-#define _USE_MATH_DEFINES
 
 #include <windows.h>
 #include <GL/gl.h>
