@@ -130,8 +130,6 @@ void create_app_window() {
     windowRect.top = (long)0;
     windowRect.bottom = (long)windowHeight;
 
-    AdjustWindowRectEx(&windowRect, dwStyle, FALSE, dwExStyle);
-
     RECT desktopRect;
     GetWindowRect(GetDesktopWindow(), &desktopRect);
     const int offsetX = (desktopRect.right - (windowRect.right - windowRect.left)) / 2;
