@@ -2,7 +2,8 @@
 #define XR_USE_GRAPHICS_API_OPENGL
 #define OPENGL_VERSION_MAJOR 4
 #define OPENGL_VERSION_MINOR 3
-#define GRAPHICS_API_OPENGL 1
+
+#if defined(XR_USE_PLATFORM_WIN32) && defined(XR_USE_GRAPHICS_API_OPENGL)
 
 #include <windows.h>
 #include <GL/gl.h>
@@ -623,3 +624,5 @@ int main(int argc, char* argv[]) {
 
 	return 0;
 }
+
+#endif
