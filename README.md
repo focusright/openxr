@@ -1,9 +1,9 @@
 # Barebones OpenXR OpenGL
 
-[Video](https://www.youtube.com/watch?v=gScJ7H8TbW0)
+[Video footage](https://www.youtube.com/watch?v=gScJ7H8TbW0)
 
-##Code Structure
-
+##Code Structure Overview
+```
 main()
     openxr_init()
     opengl_init()
@@ -43,4 +43,4 @@ openxr_render_frame()
 
 *shutdown()
     delete stuff
-
+```
