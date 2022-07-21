@@ -2,7 +2,7 @@
 
 [Video footage](https://www.youtube.com/watch?v=gScJ7H8TbW0)
 
-##Code Structure Overview
+## Code Structure Overview
 ```
 main()
     openxr_init()
