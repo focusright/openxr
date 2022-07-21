@@ -1,8 +1,10 @@
 # Barebones OpenXR OpenGL
 
-[Video footage](https://www.youtube.com/watch?v=gScJ7H8TbW0)
+# Video Footage
+[App running on PC mirroring the headset display](https://www.youtube.com/watch?v=gScJ7H8TbW0)
+[OpenXR intro + In depth of this project](https://www.youtube.com/watch?v=V_GHBv7CrOI&t=328s)
 
-## Code Structure Overview
+# Code Structure Overview
 ```
 main()
     openxr_init()
